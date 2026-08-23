@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>幻想 制作管理</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#0d0a12">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GensouFlow">
+<style>
+  :root{
+    --bg:#0d0a12;
+    --surface:#17121f;
+    --surface2:#241a30;
+    --gold:#d4af37;
+    --gold-soft:rgba(212,175,55,0.35);
+    --purple:#8b5cf6;
+    --purple-soft:rgba(139,92,246,0.35);
+    --text:#f4e9d0;
+    --text-dim:#b8aecb;
+    --danger:#e08a9e;
+    --danger-bg:#2a1420;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:"Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+    -webkit-tap-highlight-color:transparent;
+  }
+  header{padding:32px 20px 16px;}
+  .eyebrow{font-size:11px;letter-spacing:0.3em;color:var(--purple);margin:0 0 4px;}
+  h1{font-size:22px;font-weight:700;margin:0;font-family:"Hiragino Mincho ProN","Noto Serif JP",serif;}
+  main{padding:0 20px 120px;}
+
+  /* --- 一覧 --- */
+  .empty{
+    margin-top:24px;padding:32px;text-align:center;color:#8b7fa3;
+    border:1px dashed var(--gold-soft);border-radius:16px;font-size:14px;line-height:1.7;
+  }
+  .work-card{
+    width:100%;text-align:left;display:flex;align-items:center;gap:14px;
+    background:var(--surface);border:1px solid rgba(212,175,55,0.18);
+    border-radius:16px;padding:14px;margin-bottom:12px;
+    color:inherit;font:inherit;cursor:pointer;
+  }
+  .work-card:active{transform:scale(0.98);}
+  .moon{
+    position:relative;flex-shrink:0;border-radius:50%;
+    background:var(--surface2);box-shadow:inset 0 0 0 1px var(--gold-soft);
+    overflow:hidden;
+  }
+  .moon-fill{
+    position:absolute;inset:0;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #f4dfa0, #d4af37 55%, #9a7a1f 100%);
+    transition:clip-path 400ms ease;
+  }
+  .work-body{flex:1;min-width:0;}
+  .work-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .bar{width:100%;height:8px;border-radius:99px;background:var(--surface2);overflow:hidden;margin-top:8px;}
+  .bar-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--purple),var(--gold));transition:width 400ms ease;}
+  .work-count{font-size:14px;font-weight:600;white-space:nowrap;color:var(--text-dim);}
+  .work-count.done{color:var(--gold);}
+
+  .fab{
+    position:fixed;right:20px;bottom:24px;display:flex;align-items:center;gap:8px;
+    background:var(--gold);color:#1a1220;border:none;border-radius:999px;
+    padding:16px 22px;font-size:15px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,0.4);
+  }
+  .fab:active{transform:scale(0.95);}
+
+  /* --- 詳細 --- */
+  .topbar{display:flex;align-items:center;gap:10px;padding:24px 16px 16px;}
+  .back-btn{background:none;border:none;color:var(--gold);font-size:26px;padding:6px;line-height:1;}
+  .detail-title{font-size:20px;font-weight:700;font-family:"Hiragino Mincho ProN","Noto Serif JP",serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+  .progress-box{
+    display:flex;align-items:center;gap:16px;background:var(--surface);
+    border:1px solid rgba(212,175,55,0.18);border-radius:16px;padding:18px;margin:0 20px 20px;
+  }
+  .progress-count{font-size:17px;font-weight:700;margin-bottom:6px;}
+
+  .next-banner{
+    margin:0 20px 20px;padding:12px 16px;border-radius:16px;text-align:center;font-weight:700;
+    background:rgba(139,92,246,0.15);color:#c9b8f0;border:1px solid var(--purple-soft);
+  }
+  .next-banner.done{background:rgba(212,175,55,0.15);color:var(--gold);border-color:var(--gold-soft);}
+
+  .step{
+    width:calc(100% - 40px);margin:0 20px 8px;display:flex;align-items:center;gap:14px;
+    background:var(--surface);border:1px solid var(--purple-soft);border-radius:12px;
+    padding:16px;text-align:left;font-size:16px;color:var(--text);
+  }
+  .step.checked{background:rgba(212,175,55,0.1);border-color:var(--gold-soft);}
+  .checkbox{
+    width:30px;height:30px;flex-shrink:0;border-radius:8px;border:2px solid var(--purple);
+    display:flex;align-items:center;justify-content:center;font-size:16px;color:#1a1220;
+  }
+  .step.checked .checkbox{background:var(--gold);border-color:var(--gold);}
+  .step.checked .label{text-decoration:line-through;opacity:0.75;}
+
+  .action-row{display:flex;gap:12px;margin:20px;}
+  .action-btn{
+    flex:1;padding:14px;border-radius:12px;border:none;font-size:14px;font-weight:600;
+    display:flex;align-items:center;justify-content:center;gap:6px;
+  }
+  .action-btn.reset{background:var(--surface2);color:#c9b8f0;}
+  .action-btn.delete{background:var(--danger-bg);color:var(--danger);}
+
+  /* --- モーダル --- */
+  .overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(2px);
+    display:flex;align-items:flex-end;justify-content:center;z-index:50;padding:16px;
+  }
+  .modal{
+    width:100%;max-width:380px;background:var(--surface);border:1px solid var(--gold-soft);
+    border-radius:20px;padding:20px;margin-bottom:16px;
+  }
+  .modal h3{margin:0 0 8px;font-size:17px;}
+  .modal p{margin:0 0 18px;font-size:14px;color:var(--text-dim);line-height:1.6;}
+  .modal input{
+    width:100%;padding:14px;border-radius:12px;background:var(--bg);
+    border:1px solid var(--gold-soft);color:var(--text);font-size:16px;margin-bottom:16px;outline:none;
+  }
+  .modal-row{display:flex;gap:12px;}
+  .btn{flex:1;padding:14px;border-radius:12px;border:none;font-size:14px;font-weight:600;}
+  .btn.cancel{background:var(--surface2);color:#e6dcf5;}
+  .btn.confirm{background:var(--purple);color:#fdf6e3;}
+  .btn.confirm.gold{background:var(--gold);color:#1a1220;}
+  .btn.confirm.danger{background:#7a2338;color:#fdf6e3;}
+  .btn:disabled{opacity:0.4;}
+
+  .toast{
+    position:fixed;top:0;left:0;right:0;z-index:60;background:#7a2338;color:#fdf6e3;
+    text-align:center;font-size:12px;padding:10px 12px;display:flex;justify-content:center;gap:12px;
+  }
+  .toast button{background:none;border:none;color:#fdf6e3;text-decoration:underline;font-weight:700;font-size:12px;}
+</style>
+</head>
+<body>
+<div id="toast-area"></div>
+<div id="app"></div>
+
+<script>
+const STEPS = ["企画","調査","制作","販売データ作成","商品画像","タイトル","タグ","説明文","価格","最終確認","出品"];
+const STORAGE_KEY = "gensou-flow-works-v1";
+
+// ---- ローカル保存（このブラウザ/端末だけに残る） ----
+function loadWorks(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  }catch(e){
+    console.error("読み込みエラー", e);
+    return [];
+  }
+}
+function saveWorks(works){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(works));
+    return true;
+  }catch(e){
+    console.error("保存エラー", e);
+    return false;
+  }
+}
+
+let state = {
+  works: loadWorks(),
+  openId: null,
+  showNew: false,
+  confirm: null // {type:'delete'|'reset', workId}
+};
+
+function persist(){
+  const ok = saveWorks(state.works);
+  const toastArea = document.getElementById("toast-area");
+  toastArea.innerHTML = ok ? "" : `
+    <div class="toast">
+      <span>保存に失敗しました（この端末の空き容量をご確認ください）</span>
+      <button onclick="persist()">再試行する</button>
+    </div>`;
+}
+
+function render(){
+  const app = document.getElementById("app");
+  app.innerHTML = state.openId ? renderDetail() : renderList();
+  if(state.showNew) app.innerHTML += renderNewModal();
+  if(state.confirm) app.innerHTML += renderConfirmModal();
+}
+
+function moonHtml(ratio, size){
+  const pct = Math.round(ratio*100);
+  return `<div class="moon" style="width:${size}px;height:${size}px;">
+    <div class="moon-fill" style="clip-path:inset(0 ${100-pct}% 0 0);"></div>
+  </div>`;
+}
+
+function renderList(){
+  const items = state.works.map(w=>{
+    const done = w.steps.filter(Boolean).length;
+    const ratio = done/STEPS.length;
+    return `
+      <button class="work-card" onclick="openWork('${w.id}')">
+        ${moonHtml(ratio,44)}
+        <div class="work-body">
+          <div class="work-name">${escapeHtml(w.name)}</div>
+          <div class="bar"><div class="bar-fill" style="width:${Math.round(ratio*100)}%"></div></div>
+        </div>
+        <div class="work-count ${done===STEPS.length?'done':''}">${done} / ${STEPS.length}</div>
+      </button>`;
+  }).join("");
+
+  return `
+    <header>
+      <p class="eyebrow">GENSOU FLOW</p>
+      <h1>幻想 制作管理</h1>
+    </header>
+    <main>
+      ${state.works.length===0 ? `<div class="empty">まだ作品がありません。<br>右下の「＋」から最初の作品を登録しましょう。</div>` : items}
+    </main>
+    <button class="fab" onclick="state.showNew=true; render();">＋ 新しい作品</button>
+  `;
+}
+
+function renderDetail(){
+  const w = state.works.find(x=>x.id===state.openId);
+  if(!w){ state.openId=null; return renderList(); }
+  const done = w.steps.filter(Boolean).length;
+  const ratio = done/STEPS.length;
+  const nextIndex = w.steps.findIndex(s=>!s);
+  const allDone = nextIndex===-1;
+
+  const stepsHtml = STEPS.map((label,i)=>{
+    const checked = w.steps[i];
+    return `
+      <button class="step ${checked?'checked':''}" onclick="toggleStep('${w.id}',${i})">
+        <span class="checkbox">${checked?'✓':''}</span>
+        <span class="label">${i+1}. ${escapeHtml(label)}</span>
+      </button>`;
+  }).join("");
+
+  return `
+    <div class="topbar">
+      <button class="back-btn" onclick="state.openId=null; render();">‹</button>
+      <div class="detail-title">${escapeHtml(w.name)}</div>
+    </div>
+    <div class="progress-box">
+      ${moonHtml(ratio,56)}
+      <div style="flex:1">
+        <div class="progress-count">${done} / ${STEPS.length} 完了</div>
+        <div class="bar"><div class="bar-fill" style="width:${Math.round(ratio*100)}%"></div></div>
+      </div>
+    </div>
+    <div class="next-banner ${allDone?'done':''}">
+      ${allDone ? "🎉 全工程完了！" : `次は『${escapeHtml(STEPS[nextIndex])}』`}
+    </div>
+    ${stepsHtml}
+    <div class="action-row">
+      <button class="action-btn reset" onclick="state.confirm={type:'reset',workId:'${w.id}'}; render();">↺ チェックをリセット</button>
+      <button class="action-btn delete" onclick="state.confirm={type:'delete',workId:'${w.id}'}; render();">🗑 作品を削除</button>
+    </div>
+  `;
+}
+
+function renderNewModal(){
+  return `
+    <div class="overlay" onclick="if(event.target===this){state.showNew=false;render();}">
+      <div class="modal" onclick="event.stopPropagation()">
+        <h3>新しい作品</h3>
+        <input id="new-work-name" placeholder="例：狐月" autofocus
+          onkeydown="if(event.key==='Enter') submitNewWork();">
+        <div class="modal-row">
+          <button class="btn cancel" onclick="state.showNew=false; render();">キャンセル</button>
+          <button class="btn confirm gold" onclick="submitNewWork()">作成する</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderConfirmModal(){
+  const c = state.confirm;
+  const w = state.works.find(x=>x.id===c.workId);
+  if(!w){ state.confirm=null; return ""; }
+  const isDelete = c.type==="delete";
+  return `
+    <div class="overlay" onclick="if(event.target===this){state.confirm=null;render();}">
+      <div class="modal" onclick="event.stopPropagation()">
+        <h3>${isDelete? "作品を削除しますか？" : "チェックをリセットしますか？"}</h3>
+        <p>${isDelete
+          ? `「${escapeHtml(w.name)}」を削除すると、進捗データは元に戻せません。`
+          : `「${escapeHtml(w.name)}」の11工程のチェックがすべて解除されます。作品自体は削除されません。`}</p>
+        <div class="modal-row">
+          <button class="btn cancel" onclick="state.confirm=null; render();">キャンセル</button>
+          <button class="btn confirm ${isDelete?'danger':''}" onclick="${isDelete?'confirmDelete()':'confirmReset()'}">${isDelete?'削除する':'リセットする'}</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+// ---- 操作 ----
+function submitNewWork(){
+  const input = document.getElementById("new-work-name");
+  const name = input.value.trim();
+  if(!name) return;
+  const newWork = { id: Date.now().toString(), name, steps: Array(STEPS.length).fill(false) };
+  state.works.push(newWork);
+  state.showNew = false;
+  state.openId = newWork.id;
+  persist();
+  render();
+}
+
+function openWork(id){ state.openId = id; render(); }
+
+function toggleStep(workId, idx){
+  const w = state.works.find(x=>x.id===workId);
+  if(!w) return;
+  w.steps[idx] = !w.steps[idx];
+  persist();
+  render();
+}
+
+function confirmReset(){
+  const w = state.works.find(x=>x.id===state.confirm.workId);
+  if(w) w.steps = Array(STEPS.length).fill(false);
+  state.confirm = null;
+  persist();
+  render();
+}
+
+function confirmDelete(){
+  state.works = state.works.filter(x=>x.id!==state.confirm.workId);
+  state.openId = null;
+  state.confirm = null;
+  persist();
+  render();
+}
+
+render();
+
+// ---- PWA: サービスワーカー登録（オフラインでも起動できるようにする） ----
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js").catch(err=>{
+      console.log("service worker登録に失敗:", err);
+    });
+  });
+}
+</script>
+</body>
+</html>
