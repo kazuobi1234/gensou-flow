@@ -388,5 +388,23 @@ if ("serviceWorker" in navigator) {
   });
 }
 </script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
+  import { getFirestore } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAUsaXUVj9hn4TSZq89fQAA64K379nZLRI",
+    authDomain: "gensou-flow.firebaseapp.com",
+    projectId: "gensou-flow",
+    storageBucket: "gensou-flow.firebasestorage.app",
+    messagingSenderId: "54760140712",
+    appId: "1:54760140712:web:163e23a475aafe553cb79d"
+  };
+
+  const firebaseApp = initializeApp(firebaseConfig);
+  const db = getFirestore(firebaseApp);
+
+  console.log("Firebase / Firestore 接続準備OK");
+</script>
 </body>
 </html>
