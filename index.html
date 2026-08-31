@@ -452,9 +452,9 @@ onAuthStateChanged(auth, (user) => {
   const app = document.getElementById("app");
 
   if (user) {
-    console.log("ログイン中:", user.email);
-    loadWorksFromCloud();
-    
+   console.log("ログイン中:", user.email);
+loadWorksFromCloud();
+render();
   } else {
     console.log("未ログイン");
     app.innerHTML = `
