@@ -37,7 +37,7 @@
   header{padding:32px 20px 16px;}
   .eyebrow{font-size:11px;letter-spacing:0.3em;color:var(--purple);margin:0 0 4px;}
   h1{font-size:22px;font-weight:700;margin:0;font-family:"Hiragino Mincho ProN","Noto Serif JP",serif;}
-  main{padding:0 20px 120px;}
+  main{padding:0 20px 120px;}F
 
   /* --- 一覧 --- */
   .empty{
@@ -377,7 +377,7 @@ function confirmDelete(){
   render();
 }
 
-render();
+
 
 // ---- PWA: サービスワーカー登録（オフラインでも起動できるようにする） ----
 if ("serviceWorker" in navigator) {
@@ -391,6 +391,7 @@ if ("serviceWorker" in navigator) {
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
   import { getFirestore } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyAUsaXUVj9hn4TSZq89fQAA64K379nZLRI",
@@ -403,7 +404,30 @@ if ("serviceWorker" in navigator) {
 
   const firebaseApp = initializeApp(firebaseConfig);
   const db = getFirestore(firebaseApp);
+const auth = getAuth(firebaseApp);
+const provider = new GoogleAuthProvider();
+async function loginWithGoogle() {
+  await signInWithPopup(auth, provider);
+}
+window.loginWithGoogle = loginWithGoogle;  
 
+onAuthStateChanged(auth, (user) => {
+  const app = document.getElementById("app");
+
+  if (user) {
+    console.log("ログイン中:", user.email);
+    render();
+  } else {
+    console.log("未ログイン");
+    app.innerHTML = `
+      <div style="padding:32px; text-align:center;">
+        <h2>幻想フロー</h2>
+        <p>Googleアカウントでログインしてください。</p>
+        <button onclick="loginWithGoogle()">Googleでログイン</button>
+      </div>
+    `;
+  }
+}); 
   console.log("Firebase / Firestore 接続準備OK");
 </script>
 </body>
