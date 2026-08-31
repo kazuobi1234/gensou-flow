@@ -449,12 +449,12 @@ async function saveWorksToCloud(works) {
     return false;
   }
 }
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, async (user) => {
   const app = document.getElementById("app");
 
   if (user) {
    console.log("ログイン中:", user.email);
-loadWorksFromCloud();
+await loadWorksFromCloud();
 render();
   } else {
     console.log("未ログイン");
