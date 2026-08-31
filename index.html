@@ -202,6 +202,7 @@ let state = {
 
 function persist(){
   const ok = saveWorks(state.works);
+  saveWorksToCloud(state.works);
   const toastArea = document.getElementById("toast-area");
   toastArea.innerHTML = ok ? "" : `
     <div class="toast">
@@ -390,7 +391,7 @@ if ("serviceWorker" in navigator) {
 </script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
-  import { getFirestore } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 
   const firebaseConfig = {
@@ -410,13 +411,50 @@ async function loginWithGoogle() {
   await signInWithPopup(auth, provider);
 }
 window.loginWithGoogle = loginWithGoogle;  
+async function saveWorksToCloud(works) {
+  const user = auth.currentUser;
+  if (!user) return false;
 
+  try {
+    await setDoc(doc(db, "users", user.uid), {
+      works: works
+    });
+    return true;
+  } catch (e) {
+    console.error("クラウド保存エラー", e);
+    return false;
+  }
+}
+  async function loadWorksFromCloud() {
+  const user = auth.currentUser;
+  if (!user) return false;
+
+  try {
+    const snap = await getDoc(doc(db, "users", user.uid));
+
+    if (snap.exists()) {
+      const data = snap.data();
+
+      if (Array.isArray(data.works)) {
+        state.works = data.works;
+        saveWorks(state.works);
+        render();
+      }
+    }
+
+    return true;
+  } catch (e) {
+    console.error("クラウド読込エラー", e);
+    return false;
+  }
+}
 onAuthStateChanged(auth, (user) => {
   const app = document.getElementById("app");
 
   if (user) {
     console.log("ログイン中:", user.email);
-    render();
+    loadWorksFromCloud();
+    
   } else {
     console.log("未ログイン");
     app.innerHTML = `
