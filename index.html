@@ -425,6 +425,7 @@ async function saveWorksToCloud(works) {
     return false;
   }
 }
+  window.saveWorksToCloud = saveWorksToCloud;
   async function loadWorksFromCloud() {
   const user = auth.currentUser;
   if (!user) return false;
