@@ -113,7 +113,7 @@
   .ai-status{display:inline-block;margin:10px 0;padding:5px 9px;border-radius:999px;background:var(--surface2);color:#c9b8f0;font-size:12px;font-weight:700;}
   .ai-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;}
   .ai-actions button{flex:1;min-width:120px;padding:12px;border:0;border-radius:10px;font-weight:700;font-size:14px;}
-  .ai-save{background:var(--purple);color:white;}
+  .ai-save{background:var(--purple);color:white;}\n  .ai-run{background:#3f2b66;color:white;}\n  .ai-actions button:disabled{opacity:.55;cursor:wait;}
   .ai-complete{background:var(--gold);color:#1a1220;}
 
   .action-row{display:flex;gap:12px;margin:20px;}
@@ -354,7 +354,7 @@ function renderShirabePanel(w){
       <label>調査結果</label>
       <textarea id="shirabe-result" placeholder="シラベの調査結果をここに保存">${escapeHtml(s.result||"")}</textarea>
       <div class="ai-actions">
-        <button class="ai-save" onclick="saveShirabe('${w.id}')">シラベ情報を保存</button>
+        <button id="shirabe-run" class="ai-run" onclick="runShirabe('${w.id}')">🔎 シラベに調査を依頼</button>\n        <button class="ai-save" onclick="saveShirabe('${w.id}')">シラベ情報を保存</button>
         <button class="ai-complete" onclick="completeShirabe('${w.id}')">調査完了 → サクへ</button>
       </div>
     </section>`;
@@ -368,7 +368,7 @@ function saveShirabe(workId){
   w.ai.shirabe={request,result,status:result?"調査結果あり":"依頼準備済み"};
   persist(); render();
 }
-function completeShirabe(workId){
+async function runShirabe(workId){\n  const w=state.works.find(x=>x.id===workId); if(!w) return;\n  const request=document.getElementById("shirabe-request").value.trim();\n  if(!request){ alert("シラベへの調査依頼を入力してください。"); return; }\n  const button=document.getElementById("shirabe-run");\n  if(button){ button.disabled=true; button.textContent="🔎 シラベが調査中…"; }\n  if(!w.ai) w.ai={};\n  const oldResult=(w.ai.shirabe && w.ai.shirabe.result) || "";\n  w.ai.shirabe={request,result:oldResult,status:"調査中"};\n  persist();\n  try{\n    if(typeof window.requestShirabeResearch!=="function") throw new Error("認証機能の準備ができていません");\n    const result=await window.requestShirabeResearch(w.name, request);\n    w.ai.shirabe={request,result,status:"調査結果あり"};\n    persist(); render();\n  }catch(error){\n    console.error("シラベ調査エラー", error);\n    w.ai.shirabe={request,result:oldResult,status:"エラー"};\n    persist(); render();\n    alert(error instanceof Error ? error.message : "シラベの調査に失敗しました。");\n  }\n}\n\nfunction completeShirabe(workId){
   const w=state.works.find(x=>x.id===workId); if(!w) return;
   const request=document.getElementById("shirabe-request").value.trim();
   const result=document.getElementById("shirabe-result").value.trim();
@@ -405,7 +405,7 @@ function renderConfirmModal(){
         <h3>${isDelete? "作品を削除しますか？" : "チェックをリセットしますか？"}</h3>
         <p>${isDelete
           ? `「${escapeHtml(w.name)}」を削除すると、進捗データは元に戻せません。`
-          : `「${escapeHtml(w.name)}」の11工程のチェックがすべて解除されます。作品自体は削除されません。`}</p>
+          : `「${escapeHtml(w.name)}」の13工程のチェックがすべて解除されます。作品自体は削除されません。`}</p>
         <div class="modal-row">
           <button class="btn cancel" onclick="state.confirm=null; render();">キャンセル</button>
           <button class="btn confirm ${isDelete?'danger':''}" onclick="${isDelete?'confirmDelete()':'confirmReset()'}">${isDelete?'削除する':'リセットする'}</button>
@@ -489,7 +489,7 @@ const provider = new GoogleAuthProvider();
 async function loginWithGoogle() {
   await signInWithPopup(auth, provider);
 }
-window.loginWithGoogle = loginWithGoogle;  
+window.loginWithGoogle = loginWithGoogle;\n\nconst SHIRABE_ENDPOINT = "https://lkynzlittlxhbpvnuajw.supabase.co/functions/v1/shirabe-research";\nasync function requestShirabeResearch(productName, request) {\n  const user = auth.currentUser;\n  if (!user) throw new Error("Googleでログインしてください。");\n  const idToken = await user.getIdToken(true);\n  const response = await fetch(SHIRABE_ENDPOINT, {\n    method: "POST",\n    headers: {\n      "Authorization": "Bearer " + idToken,\n      "Content-Type": "application/json"\n    },\n    body: JSON.stringify({ productName, request })\n  });\n  let data = {};\n  try { data = await response.json(); } catch (_) {}\n  if (!response.ok) {\n    if (response.status === 401) throw new Error("本人認証に失敗しました。いったん再ログインしてください。");\n    throw new Error(data.error || ("シラベの調査に失敗しました（" + response.status + "）"));\n  }\n  if (!data.result) throw new Error("シラベから調査結果を取得できませんでした。");\n  return data.result;\n}\nwindow.requestShirabeResearch = requestShirabeResearch;  
 async function saveWorksToCloud(works) {
   const user = auth.currentUser;
   if (!user) return false;
