@@ -489,7 +489,7 @@ const provider = new GoogleAuthProvider();
 async function loginWithGoogle() {
   await signInWithPopup(auth, provider);
 }
-window.loginWithGoogle = loginWithGoogle;  
+window.loginWithGoogle = loginWithGoogle;\n\nconst SHIRABE_ENDPOINT = "https://lkynzlittlxhbpvnuajw.supabase.co/functions/v1/shirabe-research";\nasync function requestShirabeResearch(productName, request) {\n  const user = auth.currentUser;\n  if (!user) throw new Error("Googleでログインしてください。");\n  const idToken = await user.getIdToken(true);\n  const response = await fetch(SHIRABE_ENDPOINT, {\n    method: "POST",\n    headers: {\n      "Authorization": "Bearer " + idToken,\n      "Content-Type": "application/json"\n    },\n    body: JSON.stringify({ productName, request })\n  });\n  let data = {};\n  try { data = await response.json(); } catch (_) {}\n  if (!response.ok) {\n    if (response.status === 401) throw new Error("本人認証に失敗しました。いったん再ログインしてください。");\n    throw new Error(data.error || ("シラベの調査に失敗しました（" + response.status + "）"));\n  }\n  if (!data.result) throw new Error("シラベから調査結果を取得できませんでした。");\n  return data.result;\n}\nwindow.requestShirabeResearch = requestShirabeResearch;  
 async function saveWorksToCloud(works) {
   const user = auth.currentUser;
   if (!user) return false;
