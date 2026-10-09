@@ -113,7 +113,7 @@
   .ai-status{display:inline-block;margin:10px 0;padding:5px 9px;border-radius:999px;background:var(--surface2);color:#c9b8f0;font-size:12px;font-weight:700;}
   .ai-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;}
   .ai-actions button{flex:1;min-width:120px;padding:12px;border:0;border-radius:10px;font-weight:700;font-size:14px;}
-  .ai-save{background:var(--purple);color:white;}
+  .ai-save{background:var(--purple);color:white;}\n  .ai-run{background:#3f2b66;color:white;}\n  .ai-actions button:disabled{opacity:.55;cursor:wait;}
   .ai-complete{background:var(--gold);color:#1a1220;}
 
   .action-row{display:flex;gap:12px;margin:20px;}
@@ -354,7 +354,7 @@ function renderShirabePanel(w){
       <label>調査結果</label>
       <textarea id="shirabe-result" placeholder="シラベの調査結果をここに保存">${escapeHtml(s.result||"")}</textarea>
       <div class="ai-actions">
-        <button class="ai-save" onclick="saveShirabe('${w.id}')">シラベ情報を保存</button>
+        <button id="shirabe-run" class="ai-run" onclick="runShirabe('${w.id}')">🔎 シラベに調査を依頼</button>\n        <button class="ai-save" onclick="saveShirabe('${w.id}')">シラベ情報を保存</button>
         <button class="ai-complete" onclick="completeShirabe('${w.id}')">調査完了 → サクへ</button>
       </div>
     </section>`;
@@ -405,7 +405,7 @@ function renderConfirmModal(){
         <h3>${isDelete? "作品を削除しますか？" : "チェックをリセットしますか？"}</h3>
         <p>${isDelete
           ? `「${escapeHtml(w.name)}」を削除すると、進捗データは元に戻せません。`
-          : `「${escapeHtml(w.name)}」の11工程のチェックがすべて解除されます。作品自体は削除されません。`}</p>
+          : `「${escapeHtml(w.name)}」の13工程のチェックがすべて解除されます。作品自体は削除されません。`}</p>
         <div class="modal-row">
           <button class="btn cancel" onclick="state.confirm=null; render();">キャンセル</button>
           <button class="btn confirm ${isDelete?'danger':''}" onclick="${isDelete?'confirmDelete()':'confirmReset()'}">${isDelete?'削除する':'リセットする'}</button>
