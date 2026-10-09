@@ -368,7 +368,7 @@ function saveShirabe(workId){
   w.ai.shirabe={request,result,status:result?"調査結果あり":"依頼準備済み"};
   persist(); render();
 }
-function completeShirabe(workId){
+async function runShirabe(workId){\n  const w=state.works.find(x=>x.id===workId); if(!w) return;\n  const request=document.getElementById("shirabe-request").value.trim();\n  if(!request){ alert("シラベへの調査依頼を入力してください。"); return; }\n  const button=document.getElementById("shirabe-run");\n  if(button){ button.disabled=true; button.textContent="🔎 シラベが調査中…"; }\n  if(!w.ai) w.ai={};\n  const oldResult=(w.ai.shirabe && w.ai.shirabe.result) || "";\n  w.ai.shirabe={request,result:oldResult,status:"調査中"};\n  persist();\n  try{\n    if(typeof window.requestShirabeResearch!=="function") throw new Error("認証機能の準備ができていません");\n    const result=await window.requestShirabeResearch(w.name, request);\n    w.ai.shirabe={request,result,status:"調査結果あり"};\n    persist(); render();\n  }catch(error){\n    console.error("シラベ調査エラー", error);\n    w.ai.shirabe={request,result:oldResult,status:"エラー"};\n    persist(); render();\n    alert(error instanceof Error ? error.message : "シラベの調査に失敗しました。");\n  }\n}\n\nfunction completeShirabe(workId){
   const w=state.works.find(x=>x.id===workId); if(!w) return;
   const request=document.getElementById("shirabe-request").value.trim();
   const result=document.getElementById("shirabe-result").value.trim();
