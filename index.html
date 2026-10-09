@@ -37,7 +37,7 @@
   header{padding:32px 20px 16px;}
   .eyebrow{font-size:11px;letter-spacing:0.3em;color:var(--purple);margin:0 0 4px;}
   h1{font-size:22px;font-weight:700;margin:0;font-family:"Hiragino Mincho ProN","Noto Serif JP",serif;}
-  main{padding:0 20px 120px;}F
+  main{padding:0 20px 120px;}
 
   /* --- 一覧 --- */
   .empty{
@@ -106,6 +106,15 @@
   .owner{display:inline-block;margin-top:5px;padding:3px 8px;border-radius:999px;background:var(--surface2);color:var(--gold);font-size:11px;font-weight:700;letter-spacing:.04em;}
   .company-label{margin:0 20px 12px;color:var(--text-dim);font-size:12px;}
   .company-label strong{color:var(--gold);}
+  .ai-panel{margin:0 20px 16px;padding:16px;background:var(--surface);border:1px solid var(--gold-soft);border-radius:16px;}
+  .ai-panel h3{margin:0 0 6px;font-size:16px;color:var(--gold);}
+  .ai-panel p{margin:0 0 12px;color:var(--text-dim);font-size:13px;line-height:1.6;}
+  .ai-panel textarea{width:100%;min-height:90px;resize:vertical;padding:12px;border-radius:12px;background:var(--bg);border:1px solid var(--purple-soft);color:var(--text);font:inherit;font-size:16px;outline:none;}
+  .ai-status{display:inline-block;margin:10px 0;padding:5px 9px;border-radius:999px;background:var(--surface2);color:#c9b8f0;font-size:12px;font-weight:700;}
+  .ai-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;}
+  .ai-actions button{flex:1;min-width:120px;padding:12px;border:0;border-radius:10px;font-weight:700;font-size:14px;}
+  .ai-save{background:var(--purple);color:white;}
+  .ai-complete{background:var(--gold);color:#1a1220;}
 
   .action-row{display:flex;gap:12px;margin:20px;}
   .action-btn{
@@ -234,6 +243,8 @@ function normalizeWorks(){
     if(!Array.isArray(w.steps)) w.steps = [];
     while(w.steps.length < STEPS.length) w.steps.push(false);
     if(w.steps.length > STEPS.length) w.steps = w.steps.slice(0, STEPS.length);
+    if(!w.ai) w.ai = {};
+    if(!w.ai.shirabe) w.ai.shirabe = { request:"", result:"", status:"未依頼" };
   });
 }
 function render(){
@@ -322,12 +333,50 @@ function renderDetail(){
       ${allDone ? "🎉 全工程完了！" : `次は『${escapeHtml(STEPS[nextIndex].label)}』｜担当：${escapeHtml(STEPS[nextIndex].owner)}`}
     </div>
     <div class="company-label"><strong>AIカンパニー工程</strong> — 社員ごとの担当をつないで進行</div>
+    ${renderShirabePanel(w)}
     ${stepsHtml}
     <div class="action-row">
       <button class="action-btn reset" onclick="state.confirm={type:'reset',workId:'${w.id}'}; render();">↺ チェックをリセット</button>
       <button class="action-btn delete" onclick="state.confirm={type:'delete',workId:'${w.id}'}; render();">🗑 作品を削除</button>
     </div>
   `;
+}
+
+function renderShirabePanel(w){
+  const s = (w.ai && w.ai.shirabe) || {request:"",result:"",status:"未依頼"};
+  return `
+    <section class="ai-panel">
+      <h3>🔎 シラベ｜市場調査</h3>
+      <p>商品案について何を調べるかを保存し、シラベの調査結果をこの作品に引き継ぎます。</p>
+      <label>調査依頼</label>
+      <textarea id="shirabe-request" placeholder="例：海外で和柄スマホ壁紙の需要・競合・価格帯を調査">${escapeHtml(s.request||"")}</textarea>
+      <div class="ai-status">状態：${escapeHtml(s.status||"未依頼")}</div>
+      <label>調査結果</label>
+      <textarea id="shirabe-result" placeholder="シラベの調査結果をここに保存">${escapeHtml(s.result||"")}</textarea>
+      <div class="ai-actions">
+        <button class="ai-save" onclick="saveShirabe('${w.id}')">シラベ情報を保存</button>
+        <button class="ai-complete" onclick="completeShirabe('${w.id}')">調査完了 → サクへ</button>
+      </div>
+    </section>`;
+}
+
+function saveShirabe(workId){
+  const w=state.works.find(x=>x.id===workId); if(!w) return;
+  if(!w.ai) w.ai={};
+  const request=document.getElementById("shirabe-request").value.trim();
+  const result=document.getElementById("shirabe-result").value.trim();
+  w.ai.shirabe={request,result,status:result?"調査結果あり":"依頼準備済み"};
+  persist(); render();
+}
+function completeShirabe(workId){
+  const w=state.works.find(x=>x.id===workId); if(!w) return;
+  const request=document.getElementById("shirabe-request").value.trim();
+  const result=document.getElementById("shirabe-result").value.trim();
+  if(!request || !result){ alert("調査依頼と調査結果の両方を入力してから完了してください。"); return; }
+  if(!w.ai) w.ai={};
+  w.ai.shirabe={request,result,status:"完了"};
+  w.steps[1]=true;
+  persist(); render();
 }
 
 function renderNewModal(){
