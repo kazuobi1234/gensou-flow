@@ -102,6 +102,10 @@
   }
   .step.checked .checkbox{background:var(--gold);border-color:var(--gold);}
   .step.checked .label{text-decoration:line-through;opacity:0.75;}
+  .step-main{flex:1;min-width:0;}
+  .owner{display:inline-block;margin-top:5px;padding:3px 8px;border-radius:999px;background:var(--surface2);color:var(--gold);font-size:11px;font-weight:700;letter-spacing:.04em;}
+  .company-label{margin:0 20px 12px;color:var(--text-dim);font-size:12px;}
+  .company-label strong{color:var(--gold);}
 
   .action-row{display:flex;gap:12px;margin:20px;}
   .action-btn{
@@ -170,7 +174,21 @@ body {
 <div id="app"></div>
 
 <script>
-const STEPS = ["企画","調査","制作","販売データ作成","商品画像","タイトル","タグ","説明文","価格","最終確認","出品"];
+const STEPS = [
+  { label:"企画", owner:"チャッピー＋九軒" },
+  { label:"調査", owner:"シラベ" },
+  { label:"制作", owner:"サク" },
+  { label:"販売データ作成", owner:"ギョウ" },
+  { label:"商品画像", owner:"サク" },
+  { label:"タイトル", owner:"カク" },
+  { label:"タグ", owner:"カク" },
+  { label:"説明文", owner:"カク" },
+  { label:"価格", owner:"ギョウ" },
+  { label:"最終確認", owner:"九軒（社長）" },
+  { label:"出品", owner:"ギョウ" },
+  { label:"Instagram宣伝", owner:"ヨウ" },
+  { label:"結果分析", owner:"マトメ" }
+];
 const STORAGE_KEY = "gensou-flow-works-v1";
 
 // ---- ローカル保存（このブラウザ/端末だけに残る） ----
@@ -211,7 +229,15 @@ function persist(){
     </div>`;
 }
 
+function normalizeWorks(){
+  state.works.forEach(w=>{
+    if(!Array.isArray(w.steps)) w.steps = [];
+    while(w.steps.length < STEPS.length) w.steps.push(false);
+    if(w.steps.length > STEPS.length) w.steps = w.steps.slice(0, STEPS.length);
+  });
+}
 function render(){
+  normalizeWorks();
   const app = document.getElementById("app");
   app.innerHTML = state.openId ? renderDetail() : renderList();
   if(state.showNew) app.innerHTML += renderNewModal();
@@ -251,7 +277,7 @@ function renderList(){
   return `
     <header>
       <p class="eyebrow">GENSOU FLOW</p>
-      <h1>幻想 制作管理</h1>
+      <h1>幻想 AIカンパニー</h1>
     </header>
     <main>
       ${state.works.length===0 ? `<div class="empty">まだ作品がありません。<br>右下の「＋」から最初の作品を登録しましょう。</div>` : items}
@@ -269,11 +295,14 @@ function renderDetail(){
   const allDone = nextIndex===-1;
 
   const stepsHtml = STEPS.map((label,i)=>{
-    const checked = w.steps[i];
+    const checked = !!w.steps[i];
     return `
       <button class="step ${checked?'checked':''}" onclick="toggleStep('${w.id}',${i})">
         <span class="checkbox">${checked?'✓':''}</span>
-        <span class="label">${i+1}. ${escapeHtml(label)}</span>
+        <span class="step-main">
+          <span class="label">${i+1}. ${escapeHtml(label.label)}</span><br>
+          <span class="owner">担当：${escapeHtml(label.owner)}</span>
+        </span>
       </button>`;
   }).join("");
 
@@ -290,8 +319,9 @@ function renderDetail(){
       </div>
     </div>
     <div class="next-banner ${allDone?'done':''}">
-      ${allDone ? "🎉 全工程完了！" : `次は『${escapeHtml(STEPS[nextIndex])}』`}
+      ${allDone ? "🎉 全工程完了！" : `次は『${escapeHtml(STEPS[nextIndex].label)}』｜担当：${escapeHtml(STEPS[nextIndex].owner)}`}
     </div>
+    <div class="company-label"><strong>AIカンパニー工程</strong> — 社員ごとの担当をつないで進行</div>
     ${stepsHtml}
     <div class="action-row">
       <button class="action-btn reset" onclick="state.confirm={type:'reset',workId:'${w.id}'}; render();">↺ チェックをリセット</button>
