@@ -621,12 +621,26 @@ async function requestShirabeResearch(productName, request) {
 }
 window.requestShirabeResearch = requestShirabeResearch;
 async function requestCompanyAI(productName, employeeName, request, context) {
-  const fullRequest =
-    "あなたは幻想AIカンパニーの「" + employeeName + "」です。市場調査だけではなく、この社員の担当業務として回答してください。\n" +
+  // 現在の shirabe-research は request 最大2000文字。
+  // 社員間の引継ぎが増えても依頼本文を削らずに済むよう、
+  // 引継ぎ情報だけを末尾優先で圧縮して安全に収める。
+  const prefix =
+    "あなたは幻想AIカンパニーの「" + employeeName + "」です。担当業務として回答してください。\n" +
     "商品名: " + productName + "\n" +
-    "依頼: " + request + "\n\n" +
-    (context ? "前工程からの引継ぎ情報:\n" + context + "\n\n" : "") +
-    "推測は推測と明記し、実際に確認していないWeb情報を確認済みと表現しないでください。社長がそのまま判断・利用できる具体的な成果物を日本語で返してください。";
+    "社長からの依頼: " + request + "\n\n";
+  const suffix =
+    "\n\n重要: 引継ぎ情報にある追加商品・素材・機能は、社長が承認していない限り現行商品の仕様として断定しないでください。提案は提案と明記してください。推測や未確認のWeb情報も確認済みと表現しないでください。";
+  const header = context ? "前工程からの引継ぎ（長い場合は直近部分を優先）:\n" : "";
+  const maxRequestLength = 1950;
+  const room = Math.max(0, maxRequestLength - prefix.length - suffix.length - header.length);
+  let safeContext = context || "";
+  if(safeContext.length > room){
+    safeContext = "…（前半省略）\n" + safeContext.slice(-(Math.max(0,room-9)));
+  }
+  let fullRequest = prefix + (safeContext ? header + safeContext : "") + suffix;
+  if(fullRequest.length > maxRequestLength){
+    fullRequest = fullRequest.slice(0,maxRequestLength);
+  }
   return requestShirabeResearch(productName, fullRequest);
 }
 window.requestCompanyAI = requestCompanyAI;  
