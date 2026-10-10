@@ -423,7 +423,7 @@ async function runEmployee(workId,key,name){
   try{
     if(typeof window.requestCompanyAI!=="function") throw new Error("AI接続の準備ができていません");
     const context=employeeContext(w,key);
-    const result=await window.requestCompanyAI(w.name,name,request,context);
+    const result=await window.requestCompanyAI(w.name,key,request,context);
     w.ai[key]={request,result,status:"成果あり"};
     persist(); render();
   }catch(error){
@@ -620,28 +620,31 @@ async function requestShirabeResearch(productName, request) {
   return data.result;
 }
 window.requestShirabeResearch = requestShirabeResearch;
-async function requestCompanyAI(productName, employeeName, request, context) {
-  // 現在の shirabe-research は request 最大2000文字。
-  // 社員間の引継ぎが増えても依頼本文を削らずに済むよう、
-  // 引継ぎ情報だけを末尾優先で圧縮して安全に収める。
-  const prefix =
-    "あなたは幻想AIカンパニーの「" + employeeName + "」です。担当業務として回答してください。\n" +
-    "商品名: " + productName + "\n" +
-    "社長からの依頼: " + request + "\n\n";
-  const suffix =
-    "\n\n重要: 引継ぎ情報にある追加商品・素材・機能は、社長が承認していない限り現行商品の仕様として断定しないでください。提案は提案と明記してください。推測や未確認のWeb情報も確認済みと表現しないでください。";
-  const header = context ? "前工程からの引継ぎ（長い場合は直近部分を優先）:\n" : "";
-  const maxRequestLength = 1950;
-  const room = Math.max(0, maxRequestLength - prefix.length - suffix.length - header.length);
-  let safeContext = context || "";
-  if(safeContext.length > room){
-    safeContext = "…（前半省略）\n" + safeContext.slice(-(Math.max(0,room-9)));
+async function requestCompanyAI(productName, employeeKey, request, context) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Googleでログインしてください。");
+  const idToken = await user.getIdToken(true);
+  const response = await fetch("https://lkynzlittlxhbpvnuajw.supabase.co/functions/v1/company-ai", {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer " + idToken,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      productName,
+      employee: employeeKey,
+      request,
+      context: context || ""
+    })
+  });
+  let data = {};
+  try { data = await response.json(); } catch (_) {}
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("本人認証に失敗しました。いったん再ログインしてください。");
+    throw new Error(data.error || ("AI社員の処理に失敗しました（" + response.status + "）"));
   }
-  let fullRequest = prefix + (safeContext ? header + safeContext : "") + suffix;
-  if(fullRequest.length > maxRequestLength){
-    fullRequest = fullRequest.slice(0,maxRequestLength);
-  }
-  return requestShirabeResearch(productName, fullRequest);
+  if (!data.result) throw new Error("AI社員から成果を取得できませんでした。");
+  return data.result;
 }
 window.requestCompanyAI = requestCompanyAI;  
 async function saveWorksToCloud(works) {
