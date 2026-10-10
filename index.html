@@ -436,7 +436,8 @@ function renderApprovalPanel(w){
       <h2>👤 九軒社長｜決裁</h2>
       <p>チャッピーがAI社員の成果から推奨案をまとめました。九軒社長は内容を確認して、基本は3択で判断できます。承認してもEtsy・Instagramへの公開や販売条件変更は自動実行しません。</p>
       <div class="ai-status">状態：${escapeHtml(a.status||"未決裁")}</div>
-      <div class="approval-summary">${escapeHtml(a.recommendation||"推奨案を準備中です。")}</div>
+      <div class="approval-summary">${escapeHtml(a.recommendation||"まだ社長向け推奨案がありません。下のボタンで、現在のAI社員成果から作成できます。")}</div>
+      ${!a.recommendation ? `<div class="approval-actions"><button id="approval-generate" class="approve-btn" onclick="generateApprovalRecommendation('${w.id}')">🤖 推奨案を作成</button></div>` : ""}
       <label>修正・差し戻しメモ（必要な場合だけ）</label>
       <textarea id="approval-note" placeholder="例：価格案だけ再検討して">${escapeHtml(a.note||"")}</textarea>
       <div class="approval-actions">
@@ -445,6 +446,32 @@ function renderApprovalPanel(w){
         <button class="reject-btn" onclick="decideApproval('${w.id}','差し戻し')">↩ 差し戻し</button>
       </div>
     </section>`;
+}
+
+async function generateApprovalRecommendation(workId){
+  const w=state.works.find(x=>x.id===workId); if(!w) return;
+  const button=document.getElementById("approval-generate");
+  if(button){ button.disabled=true; button.textContent="🤖 チャッピーが整理中…"; }
+  try{
+    if(typeof window.requestCompanyAI!=="function") throw new Error("AI接続の準備ができていません");
+    const masterRequest=(w.orchestration&&w.orchestration.request)||"現在のプロジェクト成果を整理してください。";
+    const chappyResult=(w.ai&&w.ai.chappy&&w.ai.chappy.result)||"";
+    const recommendation=await window.requestCompanyAI(
+      w.name,
+      "chappy",
+      "九軒社長の作業を最小限にするため、現在保存されているAI社員の成果から、社長がそのまま承認できる『推奨案』を作成してください。未確認事項は勝手に確定せず、『推奨案』『理由』『要確認なら最小限の選択肢』を示してください。最後に社長が判断すべき項目を最大3件に絞ってください。公開・販売条件変更は実行しないでください。",
+      relayContext(w,"chappy",masterRequest)+"\n\nチャッピー統括結果:\n"+chappyResult
+    );
+    w.approval={recommendation,status:"未決裁",note:""};
+    if(!w.orchestration) w.orchestration={request:masterRequest,status:"社長承認待ち",current:""};
+    w.orchestration.status="社長承認待ち";
+    w.orchestration.current="🤖 チャッピーの推奨案が完成。公開・変更は未実行";
+    persist(); render();
+  }catch(error){
+    console.error("推奨案生成エラー",error);
+    if(button){ button.disabled=false; button.textContent="🤖 推奨案を作成"; }
+    alert(error instanceof Error?error.message:"推奨案の作成に失敗しました。");
+  }
 }
 
 function decideApproval(workId,decision){
