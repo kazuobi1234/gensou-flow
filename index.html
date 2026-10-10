@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="GensouFlow">
+<meta name="apple-mobile-web-app-title" content="AIカンパニー">
 <style>
   :root{
     --bg:#0d0a12;
@@ -250,17 +250,30 @@ function persist(){
 }
 
 function normalizeWorks(){
+  let migrated=false;
   state.works.forEach(w=>{
     if(!Array.isArray(w.steps)) w.steps = [];
     while(w.steps.length < STEPS.length) w.steps.push(false);
     if(w.steps.length > STEPS.length) w.steps = w.steps.slice(0, STEPS.length);
     if(!w.ai) w.ai = {};
     if(!w.orchestration) w.orchestration = { request:"", status:"未開始", current:"" };
+    // 旧「幻想フロー」の狐月部屋を、AIカンパニーのプロジェクト名へ一度だけ移行
+    if(!w.projectModelMigrated){
+      if(w.name==="幻想幽境-狐月-" || w.name==="幻想幽境 -狐月-" || w.name==="幻想幽境－狐月－" || w.name==="狐月"){
+        w.name="狐月｜販売改善";
+      }
+      w.projectModelMigrated=true;
+      migrated=true;
+    }
     if(!w.ai.shirabe) w.ai.shirabe = { request:"", result:"", status:"未依頼" };
     ["saku","kaku","gyou","you","matome","chappy"].forEach(key=>{
       if(!w.ai[key]) w.ai[key] = { request:"", result:"", status:"未依頼" };
     });
   });
+  if(migrated){
+    saveWorks(state.works);
+    saveWorksToCloud(state.works);
+  }
 }
 function render(){
   normalizeWorks();
@@ -302,13 +315,12 @@ function renderList(){
 
   return `
     <header>
-      <p class="eyebrow">GENSOU FLOW</p>
       <h1>AIカンパニー</h1>
     </header>
     <main>
-      ${state.works.length===0 ? `<div class="empty">まだ作品がありません。<br>右下の「＋」から最初の作品を登録しましょう。</div>` : items}
+      ${state.works.length===0 ? `<div class="empty">まだプロジェクトがありません。<br>右下の「＋」から最初のプロジェクトを作成しましょう。</div>` : items}
     </main>
-    <button class="fab" onclick="state.showNew=true; render();">＋ 新しい作品</button>
+    <button class="fab" onclick="state.showNew=true; render();">＋ 新しいプロジェクト</button>
   `;
 }
 
@@ -359,7 +371,7 @@ function renderDetail(){
     ${stepsHtml}
     <div class="action-row">
       <button class="action-btn reset" onclick="state.confirm={type:'reset',workId:'${w.id}'}; render();">↺ チェックをリセット</button>
-      <button class="action-btn delete" onclick="state.confirm={type:'delete',workId:'${w.id}'}; render();">🗑 作品を削除</button>
+      <button class="action-btn delete" onclick="state.confirm={type:'delete',workId:'${w.id}'}; render();">🗑 プロジェクトを削除</button>
     </div>
   `;
 }
@@ -474,7 +486,7 @@ function renderShirabePanel(w){
   return `
     <section class="ai-panel">
       <h3>🔎 シラベ｜市場調査</h3>
-      <p>商品案について何を調べるかを保存し、シラベの調査結果をこの作品に引き継ぎます。</p>
+      <p>プロジェクトについて何を調べるかを保存し、シラベの調査結果をこの部屋に引き継ぎます。</p>
       <label>調査依頼</label>
       <textarea id="shirabe-request" placeholder="例：海外で和柄スマホ壁紙の需要・競合・価格帯を調査">${escapeHtml(s.request||"")}</textarea>
       <div class="ai-status">状態：${escapeHtml(s.status||"未依頼")}</div>
@@ -605,8 +617,8 @@ function renderNewModal(){
   return `
     <div class="overlay" onclick="if(event.target===this){state.showNew=false;render();}">
       <div class="modal" onclick="event.stopPropagation()">
-        <h3>新しい作品</h3>
-        <input id="new-work-name" placeholder="例：狐月" autofocus
+        <h3>新しいプロジェクト</h3>
+        <input id="new-work-name" placeholder="例：狐月｜販売改善" autofocus
           onkeydown="if(event.key==='Enter') submitNewWork();">
         <div class="modal-row">
           <button class="btn cancel" onclick="state.showNew=false; render();">キャンセル</button>
@@ -624,10 +636,10 @@ function renderConfirmModal(){
   return `
     <div class="overlay" onclick="if(event.target===this){state.confirm=null;render();}">
       <div class="modal" onclick="event.stopPropagation()">
-        <h3>${isDelete? "作品を削除しますか？" : "チェックをリセットしますか？"}</h3>
+        <h3>${isDelete? "プロジェクトを削除しますか？" : "チェックをリセットしますか？"}</h3>
         <p>${isDelete
-          ? `「${escapeHtml(w.name)}」を削除すると、進捗データは元に戻せません。`
-          : `「${escapeHtml(w.name)}」の13工程のチェックがすべて解除されます。作品自体は削除されません。`}</p>
+          ? `「${escapeHtml(w.name)}」を削除すると、プロジェクト内の進捗・AI社員の成果データは元に戻せません。`
+          : `「${escapeHtml(w.name)}」の13工程のチェックがすべて解除されます。プロジェクト自体は削除されません。`}</p>
         <div class="modal-row">
           <button class="btn cancel" onclick="state.confirm=null; render();">キャンセル</button>
           <button class="btn confirm ${isDelete?'danger':''}" onclick="${isDelete?'confirmDelete()':'confirmReset()'}">${isDelete?'削除する':'リセットする'}</button>
@@ -812,7 +824,7 @@ render();
     console.log("未ログイン");
     app.innerHTML = `
       <div style="padding:32px; text-align:center;">
-        <h2>幻想フロー</h2>
+        <h2>AIカンパニー</h2>
         <p>Googleアカウントでログインしてください。</p>
         <button onclick="loginWithGoogle()">Googleでログイン</button>
       </div>
