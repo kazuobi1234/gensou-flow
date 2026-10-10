@@ -1,4 +1,4 @@
-const CACHE_NAME = "gensou-flow-v4";
+const CACHE_NAME = "ai-company-v5";
 
 const ASSETS = [
   "./",
