@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <meta name="color-scheme" content="light">
-<title>幻想 制作管理</title>
+<title>AIカンパニー</title>
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#0d0a12">
 <link rel="icon" href="./icon-192.png">
@@ -117,6 +117,15 @@
   .ai-run{background:#3f2b66;color:white;}
   .ai-actions button:disabled{opacity:.55;cursor:wait;}
   .ai-complete{background:var(--gold);color:#1a1220;}
+  .orchestrator{margin:0 20px 20px;padding:18px;background:linear-gradient(135deg,var(--surface),#21162d);border:1px solid var(--gold);border-radius:18px;}
+  .orchestrator h2{margin:0 0 6px;font-size:18px;color:var(--gold);}
+  .orchestrator p{margin:0 0 12px;color:var(--text-dim);font-size:13px;line-height:1.6;}
+  .orchestrator textarea{width:100%;min-height:100px;resize:vertical;padding:12px;border-radius:12px;background:var(--bg);border:1px solid var(--purple-soft);color:var(--text);font:inherit;font-size:16px;outline:none;}
+  .relay-status{margin:12px 0;padding:10px 12px;border-radius:12px;background:var(--surface2);font-size:13px;line-height:1.6;}
+  .relay-actions{display:flex;gap:10px;flex-wrap:wrap;}
+  .relay-actions button{flex:1;min-width:140px;padding:13px;border:0;border-radius:11px;font-weight:700;font-size:14px;}
+  .relay-start{background:var(--gold);color:#1a1220;}
+  .relay-stop{background:#5d385f;color:white;}
 
   .action-row{display:flex;gap:12px;margin:20px;}
   .action-btn{
@@ -246,6 +255,7 @@ function normalizeWorks(){
     while(w.steps.length < STEPS.length) w.steps.push(false);
     if(w.steps.length > STEPS.length) w.steps = w.steps.slice(0, STEPS.length);
     if(!w.ai) w.ai = {};
+    if(!w.orchestration) w.orchestration = { request:"", status:"未開始", current:"" };
     if(!w.ai.shirabe) w.ai.shirabe = { request:"", result:"", status:"未依頼" };
     ["saku","kaku","gyou","you","matome","chappy"].forEach(key=>{
       if(!w.ai[key]) w.ai[key] = { request:"", result:"", status:"未依頼" };
@@ -293,7 +303,7 @@ function renderList(){
   return `
     <header>
       <p class="eyebrow">GENSOU FLOW</p>
-      <h1>幻想 AIカンパニー</h1>
+      <h1>AIカンパニー</h1>
     </header>
     <main>
       ${state.works.length===0 ? `<div class="empty">まだ作品がありません。<br>右下の「＋」から最初の作品を登録しましょう。</div>` : items}
@@ -338,6 +348,7 @@ function renderDetail(){
       ${allDone ? "🎉 全工程完了！" : `次は『${escapeHtml(STEPS[nextIndex].label)}』｜担当：${escapeHtml(STEPS[nextIndex].owner)}`}
     </div>
     <div class="company-label"><strong>AIカンパニー工程</strong> — 社員ごとの担当をつないで進行</div>
+    ${renderOrchestratorPanel(w)}
     ${renderShirabePanel(w)}
     ${renderEmployeePanel(w,"saku","🎨 サク","制作・商品画像","シラベの結果をもとに、商品制作案・画像構成・モックアップ改善案を提案してください。")}
     ${renderEmployeePanel(w,"kaku","✍️ カク","販売文章","Etsy向けの商品タイトル、タグ13個、説明文を作成してください。")}
@@ -351,6 +362,111 @@ function renderDetail(){
       <button class="action-btn delete" onclick="state.confirm={type:'delete',workId:'${w.id}'}; render();">🗑 作品を削除</button>
     </div>
   `;
+}
+
+
+const AUTO_RELAY = [
+  {key:"shirabe", name:"🔎 シラベ", request:"市場・顧客・需要・競合・価格・トレンドを調査し、確認できない情報は推測と明記してください。"},
+  {key:"saku", name:"🎨 サク", request:"前工程を踏まえ、現行商品と将来案を分けて、商品画像・モックアップ・デザインの改善案を提案してください。"},
+  {key:"kaku", name:"✍️ カク", request:"確定情報だけを商品仕様として扱い、Etsy向けタイトル・タグ・説明文の改善案を作成してください。未確認情報は要確認としてください。"},
+  {key:"gyou", name:"💼 ギョウ", request:"確定情報と未承認提案を分け、価格・販売形式・出品ページ・販売改善案を整理してください。"},
+  {key:"you", name:"📱 ヨウ", request:"Instagram向け投稿文・ハッシュタグ・画像構成案を作成してください。実際の公開は行わず、社長承認待ちにしてください。"},
+  {key:"matome", name:"📊 マトメ", request:"ここまでの成果を、確定情報・未確認事項・提案・不足データ・次の判断事項に整理してください。取得していない実績データは作らないでください。"},
+  {key:"chappy", name:"🤖 チャッピー", request:"全AI社員の成果を統括し、九軒社長が承認すべき項目と承認後の次の作業を整理してください。公開・販売条件変更は実行しないでください。"}
+];
+const relayCancel = {};
+
+function renderOrchestratorPanel(w){
+  const o=w.orchestration||{request:"",status:"未開始",current:""};
+  const running=o.status==="自動進行中";
+  return `
+    <section class="orchestrator">
+      <h2>🤖 チャッピーに一括依頼</h2>
+      <p>九軒社長の指示を受け、シラベ → サク → カク → ギョウ → ヨウ → マトメ → チャッピーの順に自動で仕事を引き継ぎます。Etsy・Instagramの公開や販売条件変更は実行せず、最後に社長承認待ちで停止します。</p>
+      <label>社長からの指示</label>
+      <textarea id="orchestrator-request" placeholder="例：狐月の販売ページとInstagram宣伝を改善して">${escapeHtml(o.request||"")}</textarea>
+      <div class="relay-status">状態：<strong>${escapeHtml(o.status||"未開始")}</strong>${o.current?`<br>現在：${escapeHtml(o.current)}`:""}</div>
+      <div class="relay-actions">
+        <button class="relay-start" onclick="startAutoRelay('${w.id}')" ${running?"disabled":""}>🤖 一括で仕事を開始</button>
+        <button class="relay-stop" onclick="stopAutoRelay('${w.id}')" ${running?"":"disabled"}>⏸ 自動進行を停止</button>
+      </div>
+    </section>`;
+}
+
+function relayContext(w,key,masterRequest){
+  const names={shirabe:"シラベ",saku:"サク",kaku:"カク",gyou:"ギョウ",you:"ヨウ",matome:"マトメ",chappy:"チャッピー"};
+  const prior=AUTO_RELAY
+    .filter(x=>x.key!==key && w.ai && w.ai[x.key] && w.ai[x.key].result)
+    .map(x=>names[x.key]+"の成果:\n"+w.ai[x.key].result)
+    .join("\n\n");
+  return "九軒社長の一括指示:\n"+masterRequest+"\n\n"+(prior||"前工程の成果なし");
+}
+
+async function startAutoRelay(workId){
+  const w=state.works.find(x=>x.id===workId); if(!w) return;
+  const input=document.getElementById("orchestrator-request");
+  const masterRequest=(input?input.value:"").trim();
+  if(!masterRequest){ alert("チャッピーへの一括指示を入力してください。"); return; }
+  if(!confirm("AI社員7人を順番に自動実行します。Etsy・Instagramへの公開や販売条件変更は行いません。開始しますか？")) return;
+
+  relayCancel[workId]=false;
+  w.orchestration={request:masterRequest,status:"自動進行中",current:"開始準備"};
+  persist(); render();
+
+  try{
+    for(const job of AUTO_RELAY){
+      if(relayCancel[workId]){
+        w.orchestration.status="停止中";
+        w.orchestration.current=job.name+" の前で停止";
+        persist(); render(); return;
+      }
+
+      w.orchestration.status="自動進行中";
+      w.orchestration.current=job.name+" が作業中";
+      const oldResult=(w.ai[job.key]&&w.ai[job.key].result)||"";
+      w.ai[job.key]={request:job.request,result:oldResult,status:"作業中"};
+      persist(); render();
+
+      let result="";
+      if(job.key==="shirabe"){
+        if(typeof window.requestShirabeResearch!=="function") throw new Error("シラベ接続の準備ができていません");
+        result=await window.requestShirabeResearch(w.name, masterRequest+"\n\n"+job.request);
+      }else{
+        if(typeof window.requestCompanyAI!=="function") throw new Error("AI社員接続の準備ができていません");
+        result=await window.requestCompanyAI(w.name,job.key,masterRequest+"\n\n【担当作業】\n"+job.request,relayContext(w,job.key,masterRequest));
+      }
+      w.ai[job.key]={request:job.request,result,status:"完了"};
+
+      if(job.key==="shirabe") w.steps[1]=true;
+      if(job.key==="saku"){ w.steps[2]=true; w.steps[4]=true; }
+      if(job.key==="kaku"){ w.steps[5]=true; w.steps[6]=true; w.steps[7]=true; }
+      if(job.key==="gyou"){ w.steps[3]=true; w.steps[8]=true; }
+      if(job.key==="matome") w.steps[12]=true;
+      if(job.key==="chappy") w.steps[0]=true;
+      persist();
+    }
+
+    w.orchestration.status="社長承認待ち";
+    w.orchestration.current="🤖 チャッピーの統括完了。公開・変更は未実行";
+    persist(); render();
+    alert("AI社員の自動リレーが完了しました。チャッピーの成果を確認して、承認する内容を決めてください。");
+  }catch(error){
+    console.error("自動リレーエラー",error);
+    w.orchestration.status="エラー";
+    w.orchestration.current=error instanceof Error?error.message:"自動進行に失敗しました";
+    persist(); render();
+    alert(w.orchestration.current);
+  }
+}
+
+function stopAutoRelay(workId){
+  relayCancel[workId]=true;
+  const w=state.works.find(x=>x.id===workId);
+  if(w){
+    w.orchestration.status="停止要求";
+    w.orchestration.current="現在の社員の作業完了後に停止します";
+    persist(); render();
+  }
 }
 
 function renderShirabePanel(w){
