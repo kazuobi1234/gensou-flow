@@ -837,9 +837,7 @@ function confirmDelete(){
 // ---- PWA: サービスワーカー登録（オフラインでも起動できるようにする） ----
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js", {updateViaCache:"none"}).then(reg=>{
-      reg.update().catch(()=>{});
-    }).catch(err=>{
+    navigator.serviceWorker.register("./service-worker.js").catch(err=>{
       console.log("service worker登録に失敗:", err);
     });
   });
