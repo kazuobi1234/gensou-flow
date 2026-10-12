@@ -446,8 +446,10 @@ function renderApprovalPanel(w){
       <div style="margin-top:16px;padding:14px;border:1px solid var(--purple-soft);border-radius:12px">
         <strong>📱 Instagram投稿の事前確認（公開なし）</strong>
         <p>ヨウの最新成果を自動入力します。必要なら社長が編集できます。画像取得や投稿は行いません。</p>
-        <label>画像の公開URL（HTTPS）</label>
-        <input id="ig-image-url" type="url" placeholder="https://..." style="width:100%;padding:12px;margin:6px 0 12px;background:var(--bg);color:var(--text);border:1px solid var(--purple-soft);border-radius:9px">
+        <label>投稿画像</label>
+        <input id="ig-image-file" type="file" accept="image/jpeg,image/png,image/webp" onchange="uploadInstagramImage(this)" style="width:100%;padding:12px;margin:6px 0 8px;background:var(--bg);color:var(--text);border:1px solid var(--purple-soft);border-radius:9px">
+        <input id="ig-image-url" type="hidden" value="">
+        <p id="ig-upload-result" role="status" style="margin:0 0 12px">画像を選ぶと公開URLを自動作成します。</p>
         <label>Instagram投稿文</label>
         <textarea id="ig-caption" placeholder="${youResult ? "このヨウ成果は旧形式です。ヨウを再実行すると投稿本文だけ自動入力されます。" : "ヨウの成果がまだありません"}">${escapeHtml(instagramDraft)}</textarea>
         <button class="approve-btn" style="padding:12px;border:0;border-radius:10px;margin-top:10px" onclick="previewInstagramPost('${w.id}')">🔎 投稿前チェック（公開しない）</button>
@@ -461,6 +463,24 @@ function renderApprovalPanel(w){
     </section>`;
 }
 
+async function uploadInstagramImage(input){
+  const output=document.getElementById("ig-upload-result");
+  const urlInput=document.getElementById("ig-image-url");
+  const file=input.files&&input.files[0];
+  if(!file||!output||!urlInput)return;
+  output.textContent="画像をアップロード中…";
+  input.disabled=true;
+  try{
+    if(typeof window.requestInstagramImageUpload!=="function")throw new Error("認証の準備ができていません");
+    const data=await window.requestInstagramImageUpload(file);
+    urlInput.value=data.image_url||"";
+    output.textContent="✓ 画像準備OK。URLは自動設定しました。";
+  }catch(error){
+    urlInput.value="";
+    input.value="";
+    output.textContent="アップロード失敗："+(error.message||String(error));
+  }finally{input.disabled=false;}
+}
 async function previewInstagramPost(workId){
   const w=state.works.find(x=>x.id===workId);
   const output=document.getElementById("ig-preview-result");
@@ -909,6 +929,22 @@ async function requestInstagramPreview(image_url,caption){
   return data;
 }
 window.requestInstagramPreview=requestInstagramPreview;
+async function requestInstagramImageUpload(file){
+  const user=auth.currentUser;
+  if(!user)throw new Error("Googleでログインしてください。");
+  const idToken=await user.getIdToken(true);
+  const response=await fetch("https://lkynzlittlxhbpvnuajw.supabase.co/functions/v1/instagram-image-upload",{
+    method:"POST",
+    headers:{"Authorization":"Bearer "+idToken,"Content-Type":file.type},
+    body:file
+  });
+  let data={}; try{data=await response.json();}catch(_){}
+  if(!response.ok)throw new Error(response.status===401?"本人認証に失敗しました。再ログインしてください。":(data.error||"画像アップロードに失敗しました"));
+  if(!data.image_url)throw new Error("画像URLを取得できませんでした");
+  return data;
+}
+window.requestInstagramImageUpload=requestInstagramImageUpload;
+
   
 async function saveWorksToCloud(works) {
   const user = auth.currentUser;
