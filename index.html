@@ -430,7 +430,9 @@ function relayContext(w,key,masterRequest){
 
 function renderApprovalPanel(w){
   const a=w.approval||{recommendation:"",status:"未決裁",note:""};
-  const instagramDraft=(w.ai&&w.ai.you&&w.ai.you.result)||"";
+  const youResult=(w.ai&&w.ai.you&&w.ai.you.result)||"";
+  const instagramMatch=youResult.match(/【INSTAGRAM_POST】([\\s\\S]*?)【\\/INSTAGRAM_POST】/);
+  const instagramDraft=instagramMatch?instagramMatch[1].trim():"";
   if(!a.recommendation && (!w.orchestration || w.orchestration.status!=="社長承認待ち")) return "";
   return `
     <section class="approval-panel">
@@ -447,7 +449,7 @@ function renderApprovalPanel(w){
         <label>画像の公開URL（HTTPS）</label>
         <input id="ig-image-url" type="url" placeholder="https://..." style="width:100%;padding:12px;margin:6px 0 12px;background:var(--bg);color:var(--text);border:1px solid var(--purple-soft);border-radius:9px">
         <label>Instagram投稿文</label>
-        <textarea id="ig-caption" placeholder="ヨウの成果がまだありません">${escapeHtml(instagramDraft)}</textarea>
+        <textarea id="ig-caption" placeholder="${youResult ? "このヨウ成果は旧形式です。ヨウを再実行すると投稿本文だけ自動入力されます。" : "ヨウの成果がまだありません"}">${escapeHtml(instagramDraft)}</textarea>
         <button class="approve-btn" style="padding:12px;border:0;border-radius:10px;margin-top:10px" onclick="previewInstagramPost('${w.id}')">🔎 投稿前チェック（公開しない）</button>
         <p id="ig-preview-result" role="status" style="margin:10px 0 0"></p>
       </div>
