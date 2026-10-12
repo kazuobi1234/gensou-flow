@@ -431,7 +431,7 @@ function relayContext(w,key,masterRequest){
 function renderApprovalPanel(w){
   const a=w.approval||{recommendation:"",status:"未決裁",note:""};
   const youResult=(w.ai&&w.ai.you&&w.ai.you.result)||"";
-  const instagramMatch=youResult.match(/【INSTAGRAM_POST】([\\s\\S]*?)【\\/INSTAGRAM_POST】/);
+  const instagramMatch=youResult.match(/【INSTAGRAM_POST】([\s\S]*?)【\/INSTAGRAM_POST】/);
   const instagramDraft=instagramMatch?instagramMatch[1].trim():"";
   if(!a.recommendation && (!w.orchestration || w.orchestration.status!=="社長承認待ち")) return "";
   return `
