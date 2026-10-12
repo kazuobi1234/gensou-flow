@@ -814,6 +814,10 @@ function confirmDelete(){
 
 
 
+// ---- 起動時はFirebaseを待たず、まずローカルUIを表示する ----
+// 外部モジュールや認証が失敗しても黒画面にしない。
+try { render(); } catch (e) { console.error("初期画面の描画エラー", e); }
+
 // ---- PWA: サービスワーカー登録（オフラインでも起動できるようにする） ----
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
