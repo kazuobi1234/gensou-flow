@@ -1,4 +1,4 @@
-const CACHE_NAME = "ai-company-v15";
+const CACHE_NAME = "ai-company-v16";
 
 const ASSETS = [
   "./",
