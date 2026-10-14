@@ -327,6 +327,8 @@ function renderList(){
   return `
     <header>
       <h1>AIカンパニー</h1>
+      <div id="account-status" style="font-size:12px;opacity:.75;margin-top:6px;">アカウント確認中…</div>
+      <button id="logout-button" onclick="logoutFromGoogle()" style="display:none;margin-top:8px;">ログアウト</button>
     </header>
     <main>
       ${state.works.length===0 ? `<div class="empty">まだプロジェクトがありません。<br>右下の「＋」から最初のプロジェクトを作成しましょう。</div>` : items}
@@ -878,7 +880,7 @@ if ("serviceWorker" in navigator) {
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyAUsaXUVj9hn4TSZq89fQAA64K379nZLRI",
@@ -897,6 +899,17 @@ async function loginWithGoogle() {
   await signInWithPopup(auth, provider);
 }
 window.loginWithGoogle = loginWithGoogle;
+async function logoutFromGoogle() {
+  await signOut(auth);
+}
+window.logoutFromGoogle = logoutFromGoogle;
+
+function renderAccountStatus(user) {
+  const status = document.getElementById("account-status");
+  const logout = document.getElementById("logout-button");
+  if (status) status.textContent = user ? ("ログイン中：" + (user.email || user.displayName || "Googleアカウント")) : "未ログイン";
+  if (logout) logout.style.display = user ? "inline-block" : "none";
+}
 
 const SHIRABE_ENDPOINT = "https://lkynzlittlxhbpvnuajw.supabase.co/functions/v1/shirabe-research";
 async function requestShirabeResearch(productName, request) {
@@ -996,18 +1009,37 @@ async function saveWorksToCloud(works) {
   if (!user) return false;
 
   try {
+    const localWorks = loadWorks();
     const snap = await getDoc(doc(db, "users", user.uid));
 
-    if (snap.exists()) {
-      const data = snap.data();
-
-      if (Array.isArray(data.works)) {
-        state.works = data.works;
-        saveWorks(state.works);
-        render();
+    if (!snap.exists()) {
+      // 初回移行: この端末に既存データがあれば、空のクラウドで上書きせず先にバックアップする。
+      if (localWorks.length > 0) {
+        state.works = localWorks;
+        await saveWorksToCloud(localWorks);
       }
+      render();
+      renderAccountStatus(user);
+      return true;
     }
 
+    const data = snap.data();
+    const cloudWorks = Array.isArray(data.works) ? data.works : [];
+
+    if (cloudWorks.length === 0 && localWorks.length > 0) {
+      // Fold5など既存端末からの安全な初回移行。
+      state.works = localWorks;
+      await saveWorksToCloud(localWorks);
+    } else if (cloudWorks.length > 0) {
+      // 新端末ではクラウドの既存プロジェクトを復元。
+      state.works = cloudWorks;
+      saveWorks(state.works);
+    } else {
+      state.works = localWorks;
+    }
+
+    render();
+    renderAccountStatus(user);
     return true;
   } catch (e) {
     console.error("クラウド読込エラー", e);
@@ -1021,6 +1053,7 @@ onAuthStateChanged(auth, async (user) => {
    console.log("ログイン中:", user.email);
 await loadWorksFromCloud();
 render();
+renderAccountStatus(user);
   } else {
     console.log("未ログイン");
     app.innerHTML = `
