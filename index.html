@@ -309,6 +309,48 @@ function moonHtml(ratio, size){
   "></div>`;
 }
 
+function downloadBackup(){
+  const payload={version:1,exportedAt:new Date().toISOString(),works:state.works};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download="ai-company-backup.json"; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+window.downloadBackup=downloadBackup;
+
+async function restoreBackupFile(file){
+  if(!file) return;
+  try{
+    const data=JSON.parse(await file.text());
+    const works=Array.isArray(data)?data:(Array.isArray(data.works)?data.works:null);
+    if(!works) throw new Error("バックアップ形式が正しくありません。");
+    if(!confirm("現在のプロジェクトをバックアップ内容で復元しますか？")) return;
+    state.works=works; state.openId=null;
+    saveWorks(state.works);
+    await saveWorksToCloud(state.works);
+    render(); renderAccountStatus(auth.currentUser);
+    alert("バックアップから復元しました。");
+  }catch(e){ alert("復元に失敗しました："+e.message); }
+}
+window.restoreBackupFile=restoreBackupFile;
+
+async function restoreKogetsuRecovery(){
+  if(state.works.length>0){ alert("既存プロジェクトがあるため自動復旧は実行しません。"); return; }
+  if(!confirm("確認できた履歴から「狐月｜販売改善」を復旧しますか？")) return;
+  const researchRequest=`「彼岸の門」についてEtsy需要・競合（red spider lily / Japanese fantasy / dark forest / shrine / otherworld）、英語検索語、商品形式・価格・セット数・画像サイズ、彼岸花の文化的意味と海外名称、狐月と異なる独自デザイン案3案、AIアートの現行マーケットプレイス規約を調査してください。出品数と実売は区別し、売上を確認できない場合は需要があると断定しないでください。事実・提案・未確認を分離し、調査日・出典URLを示してください。結論→理由→数字の順で整理し、最後に進行/修正判断、推奨商品形式1つ、制作案3つと推奨案、次の作業1〜3個と完了基準を示してください。今回は調査・企画整理まで。画像生成・出品・公開は行わないでください。`;
+  const w={id:"kogetsu-recovered-"+Date.now(),name:"狐月｜販売改善",steps:Array(STEPS.length).fill(false),projectModelMigrated:true,
+    orchestration:{request:researchRequest,status:"復旧済み・再確認待ち",current:""},
+    approval:{recommendation:"",status:"未決裁",note:"履歴から復旧。消失前の決裁状態は確認できないため未決裁。"},
+    ai:{
+      shirabe:{request:researchRequest,result:"",status:"再確認待ち"},
+      saku:{request:"",result:"",status:"未依頼"},kaku:{request:"",result:"",status:"未依頼"},gyou:{request:"",result:"",status:"未依頼"},
+      you:{request:"",result:"",status:"未依頼"},matome:{request:"",result:"",status:"未依頼"},chappy:{request:"",result:"",status:"未依頼"}
+    }};
+  state.works=[w]; saveWorks(state.works); await saveWorksToCloud(state.works); render(); renderAccountStatus(auth.currentUser);
+  alert("「狐月｜販売改善」を確認できた履歴から復旧しました。未確認だった工程・社員結果は空欄のままです。");
+}
+window.restoreKogetsuRecovery=restoreKogetsuRecovery;
+
 function renderList(){
   const items = state.works.map(w=>{
     const done = w.steps.filter(Boolean).length;
@@ -333,6 +375,11 @@ function renderList(){
     <main>
       ${state.works.length===0 ? `<div class="empty">まだプロジェクトがありません。<br>右下の「＋」から最初のプロジェクトを作成しましょう。</div>` : items}
     </main>
+    <div style="margin:16px 20px 90px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button onclick="downloadBackup()" style="padding:10px 12px;">バックアップ保存</button>
+      <label style="padding:10px 12px;background:#241a30;border-radius:8px;cursor:pointer;">バックアップ復元<input type="file" accept="application/json" style="display:none" onchange="restoreBackupFile(this.files[0]);this.value=''"></label>
+      ${state.works.length===0 ? '<button onclick="restoreKogetsuRecovery()" style="padding:10px 12px;">狐月を履歴から復旧</button>' : ''}
+    </div>
     <button class="fab" onclick="state.showNew=true; render();">＋ 新しいプロジェクト</button>
   `;
 }
