@@ -1027,16 +1027,17 @@ async function saveWorksToCloud(works) {
     const data = snap.data();
     const cloudWorks = Array.isArray(data.works) ? data.works : [];
 
-    if (cloudWorks.length === 0 && localWorks.length > 0) {
-      // Fold5など既存端末からの安全な初回移行。
+    if (localWorks.length > 0) {
+      // 復旧保護: この端末に既存プロジェクトがある場合はローカルを正本として保持する。
+      // クラウドが空でも古い内容でも、ログイン直後にローカルを消さず再バックアップする。
       state.works = localWorks;
       await saveWorksToCloud(localWorks);
     } else if (cloudWorks.length > 0) {
-      // 新端末ではクラウドの既存プロジェクトを復元。
+      // 新規端末（ローカル0件）のみクラウドから復元する。
       state.works = cloudWorks;
       saveWorks(state.works);
     } else {
-      state.works = localWorks;
+      state.works = [];
     }
 
     render();
