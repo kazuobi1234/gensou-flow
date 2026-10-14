@@ -220,6 +220,8 @@ const STEPS = [
   { label:"結果分析", owner:"マトメ" }
 ];
 const STORAGE_KEY = "gensou-flow-works-v1";
+const DELETED_KEY = "gensou-flow-deleted-v1";
+let lastSavedSnapshot = "";
 
 // ---- ローカル保存（このブラウザ/端末だけに残る） ----
 function loadWorks(){
@@ -234,6 +236,7 @@ function loadWorks(){
 function saveWorks(works){
   try{
     localStorage.setItem(STORAGE_KEY, JSON.stringify(works));
+    lastSavedSnapshot = JSON.stringify(works);
     return true;
   }catch(e){
     console.error("保存エラー", e);
@@ -248,9 +251,28 @@ let state = {
   confirm: null // {type:'delete'|'reset', workId}
 };
 
+function getDeletedWorks(){
+  try { return JSON.parse(localStorage.getItem(DELETED_KEY) || "{}"); } catch (_) { return {}; }
+}
+function saveDeletedWorks(deleted){
+  localStorage.setItem(DELETED_KEY, JSON.stringify(deleted || {}));
+}
+function markChangedWorks(){
+  let previous=[];
+  try { previous = lastSavedSnapshot ? JSON.parse(lastSavedSnapshot) : loadWorks(); } catch (_) {}
+  const byId=new Map(previous.map(w=>[w.id,w]));
+  const now=Date.now();
+  state.works.forEach(w=>{
+    const old=byId.get(w.id);
+    const a=JSON.stringify({...w,updatedAt:undefined});
+    const b=old ? JSON.stringify({...old,updatedAt:undefined}) : "";
+    if(!old || a!==b) w.updatedAt=now;
+  });
+}
 function persist(){
+  markChangedWorks();
   const ok = saveWorks(state.works);
-  saveWorksToCloud(state.works);
+  saveWorksToCloud(state.works, getDeletedWorks());
   const toastArea = document.getElementById("toast-area");
   toastArea.innerHTML = ok ? "" : `
     <div class="toast">
@@ -283,7 +305,7 @@ function normalizeWorks(){
   });
   if(migrated){
     saveWorks(state.works);
-    saveWorksToCloud(state.works);
+    saveWorksToCloud(state.works, getDeletedWorks());
   }
 }
 function render(){
@@ -828,7 +850,7 @@ function submitNewWork(){
   const input = document.getElementById("new-work-name");
   const name = input.value.trim();
   if(!name) return;
-  const newWork = { id: Date.now().toString(), name, steps: Array(STEPS.length).fill(false) };
+  const newWork = { id: Date.now().toString(), name, steps: Array(STEPS.length).fill(false), updatedAt: Date.now() };
   state.works.push(newWork);
   state.showNew = false;
   state.openId = newWork.id;
@@ -855,6 +877,9 @@ function confirmReset(){
 }
 
 function confirmDelete(){
+  const deleted=getDeletedWorks();
+  deleted[state.confirm.workId]=Date.now();
+  saveDeletedWorks(deleted);
   state.works = state.works.filter(x=>x.id!==state.confirm.workId);
   state.openId = null;
   state.confirm = null;
@@ -990,60 +1015,59 @@ async function requestInstagramImageUpload(file){
 }
 window.requestInstagramImageUpload=requestInstagramImageUpload;
   
-async function saveWorksToCloud(works) {
+async function saveWorksToCloud(works, deletedWorks = getDeletedWorks()) {
   const user = auth.currentUser;
   if (!user) return false;
-
   try {
-    await setDoc(doc(db, "users", user.uid), {
-      works: works
-    });
+    await setDoc(doc(db, "users", user.uid), { works, deletedWorks });
     return true;
   } catch (e) {
     console.error("クラウド保存エラー", e);
     return false;
   }
 }
-  window.saveWorksToCloud = saveWorksToCloud;
-  async function loadWorksFromCloud() {
+window.saveWorksToCloud = saveWorksToCloud;
+
+function mergeWorks(localWorks, cloudWorks, localDeleted={}, cloudDeleted={}) {
+  const deleted={...cloudDeleted};
+  Object.entries(localDeleted).forEach(([id,ts])=>deleted[id]=Math.max(Number(deleted[id]||0),Number(ts||0)));
+  const all=new Map();
+  [...cloudWorks,...localWorks].forEach(w=>{
+    const current=all.get(w.id);
+    const wt=Number(w.updatedAt||0);
+    if(!current || wt>=Number(current.updatedAt||0)) all.set(w.id,w);
+  });
+  for(const [id,w] of [...all.entries()]){
+    if(Number(deleted[id]||0)>=Number(w.updatedAt||0)) all.delete(id);
+  }
+  return {works:[...all.values()],deleted};
+}
+
+async function loadWorksFromCloud() {
   const user = auth.currentUser;
   if (!user) return false;
-
   try {
     const localWorks = loadWorks();
+    const localDeleted = getDeletedWorks();
     const snap = await getDoc(doc(db, "users", user.uid));
-
     if (!snap.exists()) {
-      // 初回移行: この端末に既存データがあれば、空のクラウドで上書きせず先にバックアップする。
-      if (localWorks.length > 0) {
-        state.works = localWorks;
-        await saveWorksToCloud(localWorks);
-      }
-      render();
-      renderAccountStatus(user);
-      return true;
-    }
-
-    const data = snap.data();
-    const cloudWorks = Array.isArray(data.works) ? data.works : [];
-
-    if (cloudWorks.length === 0 && localWorks.length > 0) {
-      // Fold5など既存端末からの安全な初回移行。
       state.works = localWorks;
-      await saveWorksToCloud(localWorks);
-    } else if (cloudWorks.length > 0) {
-      // 新端末ではクラウドの既存プロジェクトを復元。
-      state.works = cloudWorks;
-      saveWorks(state.works);
+      if(localWorks.length>0 || Object.keys(localDeleted).length>0) await saveWorksToCloud(localWorks,localDeleted);
     } else {
-      state.works = localWorks;
+      const data=snap.data();
+      const cloudWorks=Array.isArray(data.works)?data.works:[];
+      const cloudDeleted=data.deletedWorks && typeof data.deletedWorks==="object" ? data.deletedWorks : {};
+      const merged=mergeWorks(localWorks,cloudWorks,localDeleted,cloudDeleted);
+      state.works=merged.works;
+      saveDeletedWorks(merged.deleted);
+      saveWorks(state.works);
+      await saveWorksToCloud(state.works,merged.deleted);
     }
-
     render();
     renderAccountStatus(user);
     return true;
-  } catch (e) {
-    console.error("クラウド読込エラー", e);
+  } catch(e) {
+    console.error("クラウド読込エラー",e);
     return false;
   }
 }
