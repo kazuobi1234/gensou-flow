@@ -422,6 +422,7 @@ function renderDetail(){
     <div class="company-label"><strong>AIカンパニー工程</strong> — 社員ごとの担当をつないで進行</div>
     ${renderOrchestratorPanel(w)}
     ${renderApprovalPanel(w)}
+    ${renderInstagramWorkspace(w)}
     ${renderShirabePanel(w)}
     ${renderEmployeePanel(w,"saku","🎨 サク","制作・商品画像","シラベの結果をもとに、商品制作案・画像構成・モックアップ改善案を提案してください。")}
     ${renderEmployeePanel(w,"kaku","✍️ カク","販売文章","Etsy向けの商品タイトル、タグ13個、説明文を作成してください。")}
@@ -533,6 +534,29 @@ function renderApprovalPanel(w){
     </section>`;
 }
 
+function renderInstagramWorkspace(w){
+  const draft=w.instagramStandalone||{};
+  const you=(w.ai&&w.ai.you&&w.ai.you.result)||"";
+  const match=you.match(/【INSTAGRAM_POST】([\\s\\S]*?)【\\/INSTAGRAM_POST】/);
+  const caption=draft.caption||((w.orchestration&&getRelayJobs(w.orchestration.request).some(j=>j.key==="shirabe")&&!getRelayJobs(w.orchestration.request).some(j=>["saku","kaku","gyou","you"].includes(j.key)))?"":(match?match[1].trim():""));
+  return `<section class="ai-panel">
+    <h3>📱 Instagram投稿準備（調査とは独立）</h3>
+    <p>この欄は調査レポートに関係なく利用できます。画像と投稿文を保存しても公開されません。</p>
+    <p>投稿対象：<strong>${escapeHtml(w.name)}</strong>。別作品の調査内容を流用しないでください。</p>
+    <label>投稿文</label>
+    <textarea id="ig-standalone-caption" placeholder="Instagram投稿文を入力してください">${escapeHtml(caption)}</textarea>
+    <div class="approval-actions"><button class="approve-btn" onclick="saveStandaloneInstagramDraft('${w.id}')">💾 投稿文を下書き保存（非公開）</button></div>
+    <p id="ig-standalone-status" role="status">${draft.saved_at?"保存済み。Instagramには未投稿です。":"まだ保存されていません。"}</p>
+  </section>`;
+}
+function saveStandaloneInstagramDraft(workId){
+  const w=state.works.find(x=>x.id===workId);
+  const caption=(document.getElementById("ig-standalone-caption")?.value||"").trim();
+  if(!w)return;
+  if(!caption){document.getElementById("ig-standalone-status").textContent="投稿文を入力してください。";return;}
+  w.instagramStandalone={caption,saved_at:new Date().toISOString(),published:false};
+  persist();render();
+}
 function saveInstagramDraft(workId){
   const w=state.works.find(x=>x.id===workId);
   if(!w||!w.approval||w.approval.status!=="承認"){alert("先に社長の承認が必要です。");return;}
