@@ -979,7 +979,9 @@ async function requestShirabeResearch(productName, request) {
     throw new Error(data.error || ("シラベの調査に失敗しました（" + response.status + "）"));
   }
   if (!data.result) throw new Error("シラベから調査結果を取得できませんでした。");
-  return data.result;
+  const result = String(data.result);
+  // 現在のシラベはWeb検索未接続。回答を「実地Web調査済み」と誤認しないための表示ガード。
+  return "【調査モード：Web未接続／外部情報は未確認】\n" + result;
 }
 window.requestShirabeResearch = requestShirabeResearch;
 async function requestCompanyAI(productName, employeeKey, request, context) {
