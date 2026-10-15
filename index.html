@@ -449,13 +449,18 @@ const AUTO_RELAY = [
 ];
 function getRelayJobs(masterRequest){
   const normalized=String(masterRequest||"").replace(/\s+/g,"");
+  const only=/だけ|のみ|まで/.test(normalized);
   const researchPlanningOnly=
     /調査(?:と|・)?企画整理まで/.test(normalized) ||
     /調査(?:と|・)?企画(?:の)?整理まで/.test(normalized) ||
     (/調査/.test(normalized) && /企画整理/.test(normalized) && /まで/.test(normalized));
-  if(researchPlanningOnly){
-    return AUTO_RELAY.filter(job=>["shirabe","matome","chappy"].includes(job.key));
-  }
+  if(researchPlanningOnly) return AUTO_RELAY.filter(job=>["shirabe","matome","chappy"].includes(job.key));
+  // Explicitly scoped requests should not wake unrelated employees.
+  if(only && /調査|市場|競合|需要/.test(normalized)) return AUTO_RELAY.filter(job=>["shirabe","matome","chappy"].includes(job.key));
+  if(only && /デザイン|制作案|画像案|モック/.test(normalized)) return AUTO_RELAY.filter(job=>["saku","matome","chappy"].includes(job.key));
+  if(only && /文章|説明文|タイトル|タグ/.test(normalized)) return AUTO_RELAY.filter(job=>["kaku","matome","chappy"].includes(job.key));
+  if(only && /価格|販売|出品案/.test(normalized)) return AUTO_RELAY.filter(job=>["gyou","matome","chappy"].includes(job.key));
+  if(only && /Instagram|インスタ|SNS|投稿文/.test(normalized)) return AUTO_RELAY.filter(job=>["you","matome","chappy"].includes(job.key));
   return AUTO_RELAY;
 }
 
