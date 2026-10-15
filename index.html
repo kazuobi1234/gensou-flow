@@ -980,8 +980,11 @@ async function requestShirabeResearch(productName, request) {
   }
   if (!data.result) throw new Error("シラベから調査結果を取得できませんでした。");
   const result = String(data.result);
-  // 現在のシラベはWeb検索未接続。回答を「実地Web調査済み」と誤認しないための表示ガード。
-  return "【調査モード：Web未接続／外部情報は未確認】\n" + result;
+  // 調査経路はEdge Function側の結果に従う。YouTube APIは接続済み、一般Web/Etsyは別扱い。
+  const mode = data.youtubeStatus && String(data.youtubeStatus).includes("取得済み")
+    ? "【調査モード：YouTube接続済み／一般Web・Etsy未接続】\n"
+    : "【調査モード：一般Web・Etsy未接続】\n";
+  return mode + result;
 }
 window.requestShirabeResearch = requestShirabeResearch;
 async function requestCompanyAI(productName, employeeKey, request, context) {
