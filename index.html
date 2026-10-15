@@ -659,6 +659,12 @@ async function startAutoRelay(workId){
         if(typeof window.requestCompanyAI!=="function") throw new Error("AI社員接続の準備ができていません");
         result=await window.requestCompanyAI(w.name,job.key,masterRequest+"\n\n【担当作業】\n"+job.request,relayContext(w,job.key,masterRequest));
       }
+      if(relayCancel[workId]){
+        w.ai[job.key]={request:job.request,result,status:"停止後に結果受信"};
+        w.orchestration.status="停止中";
+        w.orchestration.current=job.name+" の作業完了後に停止。後続の社員と決裁案は未実行";
+        persist(); render(); return;
+      }
       w.ai[job.key]={request:job.request,result,status:"完了"};
 
       if(job.key==="shirabe") w.steps[1]=true;
