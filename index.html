@@ -537,11 +537,12 @@ function renderApprovalPanel(w){
 function renderInstagramWorkspace(w){
   const draft=w.instagramStandalone||{};
   const you=(w.ai&&w.ai.you&&w.ai.you.result)||"";
-  const match=you.match(/【INSTAGRAM_POST】([\\s\\S]*?)【\\/INSTAGRAM_POST】/);
-  const caption=draft.caption||((w.orchestration&&getRelayJobs(w.orchestration.request).some(j=>j.key==="shirabe")&&!getRelayJobs(w.orchestration.request).some(j=>["saku","kaku","gyou","you"].includes(j.key)))?"":(match?match[1].trim():""));
+  const begin=you.indexOf("【INSTAGRAM_POST】"),end=you.indexOf("【/INSTAGRAM_POST】");
+  const extracted=begin>=0&&end>begin?you.slice(begin+"【INSTAGRAM_POST】".length,end).trim():"";
+  const caption=draft.caption||((w.orchestration&&getRelayJobs(w.orchestration.request).some(j=>j.key==="shirabe")&&!getRelayJobs(w.orchestration.request).some(j=>["saku","kaku","gyou","you"].includes(j.key)))?"":extracted);
   return `<section class="ai-panel">
     <h3>📱 Instagram投稿準備（調査とは独立）</h3>
-    <p>この欄は調査レポートに関係なく利用できます。画像と投稿文を保存しても公開されません。</p>
+    <p>この欄は調査レポートに関係なく利用できます。投稿文を保存しても公開されません。画像登録と公開連携は準備中です。</p>
     <p>投稿対象：<strong>${escapeHtml(w.name)}</strong>。別作品の調査内容を流用しないでください。</p>
     <label>投稿文</label>
     <textarea id="ig-standalone-caption" placeholder="Instagram投稿文を入力してください">${escapeHtml(caption)}</textarea>
