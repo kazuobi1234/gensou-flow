@@ -517,10 +517,11 @@ function renderApprovalPanel(w){
         <p>ヨウの最新成果を自動入力します。必要なら社長が編集できます。画像を選んでもInstagramへの公開は行いません。</p>
         <label>投稿画像</label>
         <input id="ig-image-file" type="file" accept="image/jpeg,image/png,image/webp" onchange="uploadInstagramImage(this,'${w.id}')" style="width:100%;padding:12px;margin:6px 0;background:var(--bg);color:var(--text);border:1px solid var(--purple-soft);border-radius:9px">
-        <input id="ig-image-url" type="hidden" value="">
+        <input id="ig-image-url" type="hidden" value="${escapeHtml((w.instagramDraft&&w.instagramDraft.image_url)||"")}">
         <p id="ig-upload-status" role="status" style="margin:6px 0 12px">画像はまだ選択されていません。</p>
         <label>Instagram投稿文</label>
-        <textarea id="ig-caption" placeholder="${youResult ? "このヨウ成果は旧形式です。ヨウを再実行すると投稿本文だけ自動入力されます。" : "ヨウの成果がまだありません"}">${escapeHtml(instagramDraft)}</textarea>
+        <textarea id="ig-caption" placeholder="${youResult ? "このヨウ成果は旧形式です。ヨウを再実行すると投稿本文だけ自動入力されます。" : "ヨウの成果がまだありません"}">${escapeHtml((w.instagramDraft&&w.instagramDraft.caption)||instagramDraft)}</textarea>
+        <button class="revise-btn" style="padding:12px;border:0;border-radius:10px;margin-top:10px" onclick="saveInstagramDraft(\'${w.id}\')">💾 投稿下書きを保存</button>
         <button class="approve-btn" style="padding:12px;border:0;border-radius:10px;margin-top:10px" onclick="previewInstagramPost('${w.id}')">🔎 投稿前チェック（公開しない）</button>
         <p id="ig-preview-result" role="status" style="margin:10px 0 0"></p>
       </div>
@@ -532,6 +533,16 @@ function renderApprovalPanel(w){
     </section>`;
 }
 
+function saveInstagramDraft(workId){
+  const w=state.works.find(x=>x.id===workId);
+  if(!w||!w.approval||w.approval.status!=="承認"){alert("先に社長の承認が必要です。");return;}
+  const image_url=(document.getElementById("ig-image-url")?.value||"").trim();
+  const caption=(document.getElementById("ig-caption")?.value||"").trim();
+  if(!image_url||!caption){alert("画像と投稿文を用意してください。");return;}
+  w.instagramDraft={image_url,caption,saved_at:new Date().toISOString(),published:false};
+  persist();render();
+  alert("投稿下書きを保存しました。Instagramには公開していません。");
+}
 async function uploadInstagramImage(input,workId){
   const output=document.getElementById("ig-upload-status"), hidden=document.getElementById("ig-image-url");
   const file=input&&input.files&&input.files[0]; if(!output||!hidden||!file)return;
@@ -542,7 +553,7 @@ async function uploadInstagramImage(input,workId){
     if(typeof window.requestInstagramImageUpload!=="function")throw new Error("認証の準備ができていません");
     const result=await window.requestInstagramImageUpload(file);
     if(!result||!result.image_url)throw new Error("画像URLを取得できませんでした");
-    hidden.value=result.image_url; output.textContent="✓ 画像を準備しました。まだInstagramには公開していません。";
+    hidden.value=result.image_url; w.instagramDraft={...(w.instagramDraft||{}),image_url:result.image_url,published:false};persist(); output.textContent="✓ 画像を準備しました。まだInstagramには公開していません。";
   }catch(e){hidden.value="";input.value="";output.textContent="画像の準備に失敗："+e.message;}
   finally{input.disabled=false;}
 }
