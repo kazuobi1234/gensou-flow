@@ -522,13 +522,29 @@ function renderApprovalPanel(w){
     </section>`;
 }
 
+function extractYouInstagramCaption(result){
+  const text=String(result||"").trim();
+  const tagged=text.match(/【INSTAGRAM_POST】([\s\S]*?)【\/INSTAGRAM_POST】/);
+  if(tagged?.[1]?.trim()) return {caption:tagged[1].trim(),source:"新形式"};
+  const lines=text.split(/\r?\n/);
+  const start=lines.findIndex(line=>/^\s*(?:#{1,6}\s*)?(?:\*\*)?(?:📱\s*)?(?:Instagram|インスタグラム)?(?:用)?(?:の)?投稿文(?:案)?(?:\*\*)?\s*[：:]?\s*$/i.test(line.trim()) && /投稿文/.test(line));
+  if(start<0)return {caption:"",source:"旧形式・抽出対象なし"};
+  const selected=[];
+  for(const line of lines.slice(start+1)){
+    if(selected.some(x=>x.trim()) && /^\s*(?:#{1,6}\s+|【[^】]+】|(?:画像構成|投稿方針|補足|理由|注意点|分析|次のステップ)\s*[：:])/.test(line))break;
+    selected.push(line);
+    if(selected.length>=40)break;
+  }
+  const caption=selected.join("\n").trim();
+  return {caption:caption.length>=10?caption:"",source:"旧形式・要確認"};
+}
 function renderInstagramWorkspace(w){
   const draft=w.instagramStandalone||{};
   const approvedDraft=w.instagramDraft||{};
   const you=(w.ai&&w.ai.you&&w.ai.you.result)||"";
-  const match=you.match(/【INSTAGRAM_POST】([\s\S]*?)【\/INSTAGRAM_POST】/);
-  const extracted=match?match[1].trim():"";
-  const caption=draft.caption||approvedDraft.caption||extracted;
+  const inherited=extractYouInstagramCaption(you);
+  const caption=draft.caption||approvedDraft.caption||inherited.caption;
+  const captionOrigin=draft.caption?"保存済み":approvedDraft.caption?"画像付き下書き":inherited.source;
   const approved=(w.approval&&w.approval.status==="承認");
   const imageUrl=approvedDraft.image_url||"";
   return `<section class="ai-panel" id="instagram-workspace">
@@ -536,6 +552,8 @@ function renderInstagramWorkspace(w){
     <p>投稿対象：<strong>${escapeHtml(w.name)}</strong>。投稿文と画像を一か所で準備できます。保存・事前チェックでInstagramには公開されません。</p>
     <p class="ai-status">決裁：${approved?"承認済み":"未承認・準備のみ"}</p>
     <label>投稿文（保存済みの下書きを優先）</label>
+    <p style="color:var(--text-dim)">取得元：${escapeHtml(captionOrigin)}。旧形式の候補は確認してから保存してください。</p>
+    ${(!draft.caption&&!approvedDraft.caption&&!inherited.caption&&you)?`<details><summary>ヨウの旧成果を表示（抽出できません）</summary><textarea readonly style="width:100%;min-height:150px">${escapeHtml(you)}</textarea></details>`:""}
     <textarea id="ig-standalone-caption" placeholder="Instagram投稿文を入力してください">${escapeHtml(caption)}</textarea>
     <div class="approval-actions"><button class="approve-btn" onclick="saveStandaloneInstagramDraft('${w.id}')">💾 投稿文を下書き保存（非公開）</button></div>
     <p id="ig-standalone-status" role="status">${draft.saved_at?"投稿文は保存済み。Instagramには未投稿です。":"投稿文はまだ保存されていません。"}</p>
