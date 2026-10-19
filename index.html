@@ -566,7 +566,7 @@ async function runInstagramMetaDiagnostic(){
   const x=await window.requestInstagramMetaDiagnostic();
   const flag=v=>v===true?"はい":v===false?"いいえ":"確認できません";
   el.textContent=x.token_valid
-   ? "✓ アカウント照会成功\nMetaのidと登録ID："+flag(x.id_field_matches)+"\nMetaのuser_idと登録ID："+flag(x.user_id_field_matches)+"\n投稿先ユーザー名："+(x.username||"確認できません")+"\nkunogistudioとの一致："+flag(x.username_matches_expected)+"\nアカウント種別："+(x.account_type||"確認できません")+"\n投稿権限："+(x.publish_permission==="granted"?"権限表示あり（実投稿は未検証）":x.publish_permission==="not_granted"?"許可なし":"確認できません")+"\n権限照会HTTP："+(x.publish_permission_http_status??"未取得")+"\nMetaエラー種別："+(x.publish_error_type||"未取得")+"\nMetaエラーコード："+(x.publish_error_code??"未取得")+"\nMetaサブコード："+(x.publish_error_subcode??"未取得")
+   ? "✓ アカウント照会成功\nMetaのidと登録ID："+flag(x.id_field_matches)+"\nMetaのuser_idと登録ID："+flag(x.user_id_field_matches)+"\n投稿先ユーザー名："+(x.username||"確認できません")+"\nkunogistudioとの一致："+flag(x.username_matches_expected)+"\nアカウント種別："+(x.account_type||"確認できません")+"\n投稿権限：確認できません（権限検証方式の確認が必要）"
    : "Meta認証を確認できません。HTTP="+(x.meta_http_status||"不明")+" エラーコード="+(x.meta_error_code??"不明");
  }catch(e){el.textContent="確認失敗："+(e.message||String(e));}
 }
