@@ -552,7 +552,29 @@ function renderInstagramDiagnostics(w){
     <p id="ig-prepare-test-result" role="status" style="white-space:pre-wrap;margin-top:12px">まだ申請テストしていません。テスト用レコードを1件作成しますが、承認や公開は行いません。</p>
     <div class="approval-actions"><button class="approve-btn" type="button" onclick="runInstagramApprovalDiagnostic()">🧪 承認・改変拒否・再承認をテスト（非公開）</button></div>
     <p id="ig-approval-test-result" role="status" style="white-space:pre-wrap;margin-top:12px">承認テストは未実行です。テスト用申請を新規作成して承認記録だけを検証します。</p>
+    <div class="approval-actions"><button class="revise-btn" type="button" onclick="runInstagramClaimDiagnostic()">🧪 公開直前の二重実行防止をテスト（公開なし）</button></div>
+    <p id="ig-claim-test-result" role="status" style="white-space:pre-wrap;margin-top:12px">未実行。テスト申請と承認記録を作成し、公開処理の代わりに状態を1回だけ確定します。</p>
   </section>`;
+}
+async function runInstagramClaimDiagnostic(){
+ const out=document.getElementById("ig-claim-test-result");if(!out)return;
+ const button=out.parentElement?.querySelector('button[onclick="runInstagramClaimDiagnostic()"]');
+ if(button)button.disabled=true;
+ out.textContent="二重実行防止テスト中…";
+ const base={project_id:"instagram-diagnostic",request_key:crypto.randomUUID(),caption:"【非公開テスト】二重実行防止",image_url:"https://example.com/claim-test.jpg"};
+ const lines=[];
+ try{
+   const prep=await window.requestInstagramGuard({...base,action:"prepare"});
+   if(!prep.prepared)throw Error("申請の準備に失敗");lines.push("✓ 申請を準備");
+   const approval=await window.requestInstagramGuard({...base,action:"approve",confirmation:"この投稿内容を承認する"});
+   if(!approval.approved)throw Error("承認記録に失敗");lines.push("✓ サーバーに承認を記録");
+   const first=await window.requestInstagramGuard({action:"dry_run_claim",request_key:base.request_key});
+   lines.push(first.claimed===true&&!first.published?"✓ 初回だけ処理開始を記録":"✗ 初回判定が想定外");
+   const second=await window.requestInstagramGuard({action:"dry_run_claim",request_key:base.request_key});
+   lines.push(second.claimed===false&&second.already_claimed===true&&!second.published?"✓ 2回目の処理を防止":"✗ 2回目の判定が想定外");
+   out.textContent=lines.join("\n")+"\nMeta APIは呼び出していません。実投稿時の二重防止は別途検証が必要です。";
+ }catch(e){out.textContent=lines.join("\n")+"\n中断："+(e.message||String(e));}
+ finally{if(button)button.disabled=false;}
 }
 async function runInstagramApprovalDiagnostic(){
   const output=document.getElementById("ig-approval-test-result");
