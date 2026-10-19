@@ -554,7 +554,20 @@ function renderInstagramDiagnostics(w){
     <p id="ig-approval-test-result" role="status" style="white-space:pre-wrap;margin-top:12px">承認テストは未実行です。テスト用申請を新規作成して承認記録だけを検証します。</p>
     <div class="approval-actions"><button class="revise-btn" type="button" onclick="runInstagramClaimDiagnostic()">🧪 公開直前の二重実行防止をテスト（公開なし）</button></div>
     <p id="ig-claim-test-result" role="status" style="white-space:pre-wrap;margin-top:12px">未実行。テスト申請と承認記録を作成し、公開処理の代わりに状態を1回だけ確定します。</p>
+    <div class="approval-actions"><button class="approve-btn" onclick="runInstagramMetaDiagnostic()" type="button">🔍 Metaアカウント接続診断（非公開）</button></div>
+    <p id="ig-meta-test-result" role="status" style="white-space:pre-wrap;margin-top:12px">未実行。トークンや秘密鍵は表示しません。投稿権限の完全な検証は行いません。</p>
   </section>`;
+}
+async function runInstagramMetaDiagnostic(){
+ const el=document.getElementById("ig-meta-test-result");if(!el)return;
+ el.textContent="Metaアカウントを照会中…";
+ try{
+  if(typeof window.requestInstagramMetaDiagnostic!=="function")throw Error("API未接続");
+  const x=await window.requestInstagramMetaDiagnostic();
+  el.textContent=x.token_valid
+   ? "✓ アカウント照会成功\n登録ID一致："+(x.account_matches?"はい":"いいえ")+"\nアカウント種別："+(x.account_type||"確認できません")+"\n投稿権限：未検証"
+   : "Meta認証を確認できません。HTTP="+(x.meta_http_status||"不明")+" エラーコード="+(x.meta_error_code??"不明");
+ }catch(e){el.textContent="確認失敗："+(e.message||String(e));}
 }
 async function runInstagramClaimDiagnostic(){
  const out=document.getElementById("ig-claim-test-result");if(!out)return;
@@ -1243,6 +1256,13 @@ async function requestCompanyAI(productName, employeeKey, request, context) {
   return data.result;
 }
 window.requestCompanyAI = requestCompanyAI;
+async function requestInstagramMetaDiagnostic(){
+ const user=auth.currentUser;if(!user)throw Error("Googleログインが必要です");
+ const token=await user.getIdToken(true);
+ const res=await fetch("https://lkynzlittlxhbpvnuajw.supabase.co/functions/v1/instagram-meta-diagnostic",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:"{}"});
+ const data=await res.json();if(!res.ok)throw Error(data.error||"照会失敗");return data;
+}
+window.requestInstagramMetaDiagnostic=requestInstagramMetaDiagnostic;
 async function requestInstagramGuard(payload){
  const user=auth.currentUser;
  if(!user)throw new Error("Googleでログインしてください。");
