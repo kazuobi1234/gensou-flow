@@ -568,8 +568,52 @@ function renderInstagramWorkspace(w){
       <button class="approve-btn" onclick="previewInstagramPost('${w.id}')" ${approved?"":"disabled"}>🔎 投稿前チェック（公開なし）</button>
     </div>
     <p id="ig-preview-result" role="status"></p>
+    <div class="approval-actions">
+      <button class="approve-btn" onclick="prepareInstagramApproval('${w.id}')" ${approved?"":"disabled"}>🔐 投稿申請をサーバーへ登録（非公開）</button>
+      <button class="revise-btn" onclick="approveInstagramServerSide('${w.id}')" ${approved?"":"disabled"}>✅ 投稿内容をサーバー承認（非公開）</button>
+    </div>
+    <p id="ig-server-status" role="status">Instagramには公開されません。申請登録 → 内容を確認 → サーバー承認の順で操作します。</p>
     <p style="color:var(--text-dim)">公開操作は実装していません。投稿文だけの保存は決裁前でもできます。</p>
   </section>`;
+}
+async function sendInstagramGuard(payload){
+  if(typeof window.requestInstagramGuard!=="function")throw new Error("認証接続の準備ができていません");
+  return window.requestInstagramGuard(payload);
+}
+async function prepareInstagramApproval(workId){
+  const w=state.works.find(x=>x.id===workId),output=document.getElementById("ig-server-status");
+  if(!w||!output)return;
+  if(w.approval?.status!=="承認"){output.textContent="まず決裁欄で承認してください。";return;}
+  const caption=document.getElementById("ig-caption")?.value.trim()||"";
+  const image_url=document.getElementById("ig-image-url")?.value.trim()||"";
+  if(!caption||!image_url){output.textContent="投稿文と画像URLが必要です。";return;}
+  const request_key=crypto.randomUUID();
+  output.textContent="サーバーへ申請登録中…";
+  try {
+    const r=await sendInstagramGuard({action:"prepare",project_id:workId,request_key,caption,image_url});
+    if(!r.prepared)throw Error("申請を登録できませんでした");
+    w.instagramPublishRequest={request_key,caption,image_url,status:"prepared"};
+    persist();
+    output.textContent="申請登録済み。未公開です。次に投稿内容を確認してサーバー承認できます。";
+  }catch(e){output.textContent="登録失敗："+(e.message||String(e));}
+}
+async function approveInstagramServerSide(workId){
+  const w=state.works.find(x=>x.id===workId),output=document.getElementById("ig-server-status");
+  if(!w||!output)return;
+  const pending=w.instagramPublishRequest;
+  if(w.approval?.status!=="承認"||!pending){output.textContent="先に承認と申請登録が必要です。";return;}
+  const caption=document.getElementById("ig-caption")?.value.trim()||"";
+  const image_url=document.getElementById("ig-image-url")?.value.trim()||"";
+  if(caption!==pending.caption||image_url!==pending.image_url){output.textContent="申請後に内容が変更されています。新しく申請登録してください。";return;}
+  if(!confirm("この投稿文と画像をサーバーに承認記録しますか？Instagramへの公開は行いません。"))return;
+  output.textContent="サーバーへ承認記録中…";
+  try{
+    const r=await sendInstagramGuard({action:"approve",project_id:workId,request_key:pending.request_key,caption,image_url,confirmation:"この投稿内容を承認する"});
+    if(!r.approved)throw Error("承認できませんでした");
+    w.instagramPublishRequest={...pending,status:"approved"};
+    persist();
+    output.textContent="サーバー承認記録済み。Instagramへの投稿は行っていません。";
+  }catch(e){output.textContent="承認失敗："+(e.message||String(e));}
 }
 function saveStandaloneInstagramDraft(workId){
   const w=state.works.find(x=>x.id===workId);
@@ -1091,6 +1135,19 @@ async function requestCompanyAI(productName, employeeKey, request, context) {
   return data.result;
 }
 window.requestCompanyAI = requestCompanyAI;
+async function requestInstagramGuard(payload){
+ const user=auth.currentUser;
+ if(!user)throw new Error("Googleでログインしてください。");
+ const token=await user.getIdToken(true);
+ const response=await fetch("https://lkynzlittlxhbpvnuajw.supabase.co/functions/v1/instagram-publish-guard",{
+ method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},
+ body:JSON.stringify(payload)
+ });
+ const data=await response.json();
+ if(!response.ok)throw Error(data.error||"サーバー確認に失敗しました");
+ return data;
+}
+window.requestInstagramGuard=requestInstagramGuard;
 async function requestInstagramPreview(image_url,caption){
   const user=auth.currentUser;
   if(!user)throw new Error("Googleでログインしてください。");
