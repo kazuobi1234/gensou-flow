@@ -423,6 +423,7 @@ function renderDetail(){
     ${renderOrchestratorPanel(w)}
     ${renderApprovalPanel(w)}
     ${renderInstagramWorkspace(w)}
+    ${renderInstagramDiagnostics(w)}
     ${renderShirabePanel(w)}
     ${renderEmployeePanel(w,"saku","🎨 サク","制作・商品画像","シラベの結果をもとに、商品制作案・画像構成・モックアップ改善案を提案してください。")}
     ${renderEmployeePanel(w,"kaku","✍️ カク","販売文章","Etsy向けの商品タイトル、タグ13個、説明文を作成してください。")}
@@ -537,6 +538,35 @@ function extractYouInstagramCaption(result){
   }
   const caption=selected.join("\n").trim();
   return {caption:caption.length>=10?caption:"",source:"旧形式・要確認"};
+}
+function renderInstagramDiagnostics(w){
+  // この画面はAPIのvalidateのみを試験する。承認状態や公開処理を変更しない。
+  if(w.name!=="Instagram連携テスト") return "";
+  return `<section class="ai-panel" style="border-color:var(--purple)">
+    <h3>🧪 Instagram連携テスト専用（非公開）</h3>
+    <p>AI社員の実行・決裁・画像アップロード不要。Firebaseでログインした状態で、サーバーの本人認証と投稿形式の判定だけを確認します。</p>
+    <p>画像URLには形式確認用の仮URLを使います。実際の画像へのアクセスやInstagram投稿は行いません。</p>
+    <button class="approve-btn" style="padding:12px;border:0;border-radius:10px" onclick="runInstagramDiagnostic()" type="button">🔒 本人認証・入力形式をテスト（非公開）</button>
+    <p id="ig-diagnostic-result" role="status" style="margin-top:12px">まだテストしていません。</p>
+  </section>`;
+}
+async function runInstagramDiagnostic(){
+  const output=document.getElementById("ig-diagnostic-result");
+  if(!output)return;
+  output.textContent="本人認証・形式チェック中…";
+  try{
+    if(typeof window.requestInstagramGuard!=="function")throw Error("API接続が準備できていません");
+    const result=await window.requestInstagramGuard({
+      action:"validate",
+      caption:"【Instagram連携テスト】非公開の入力形式テストです。",
+      image_url:"https://example.com/instagram-diagnostic.jpg"
+    });
+    output.textContent=result.ok&&result.ready&&!result.published
+      ?"✓ サーバーが認証付きリクエストを受け付け、入力形式をOKと判定しました。画像の到達性・公開動作は未検証です。"
+      :"要確認："+(result.errors||[]).join("／");
+  }catch(error){
+    output.textContent="テスト失敗："+(error.message||String(error));
+  }
 }
 function renderInstagramWorkspace(w){
   const draft=w.instagramStandalone||{};
