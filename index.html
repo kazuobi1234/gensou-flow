@@ -548,6 +548,8 @@ function renderInstagramDiagnostics(w){
     <p>画像URLには形式確認用の仮URLを使います。実際の画像へのアクセスやInstagram投稿は行いません。</p>
     <button class="approve-btn" style="padding:12px;border:0;border-radius:10px" onclick="runInstagramDiagnostic()" type="button">🔒 本人認証・入力形式をテスト（非公開）</button>
     <p id="ig-diagnostic-result" role="status" style="margin-top:12px">まだテストしていません。</p>
+    <div class="approval-actions"><button class="revise-btn" type="button" onclick="runInstagramPrepareDiagnostic()">🧪 申請保存・重複・変更拒否をテスト（非公開）</button></div>
+    <p id="ig-prepare-test-result" role="status" style="white-space:pre-wrap;margin-top:12px">まだ申請テストしていません。テスト用レコードを1件作成しますが、承認や公開は行いません。</p>
   </section>`;
 }
 async function runInstagramDiagnostic(){
@@ -567,6 +569,31 @@ async function runInstagramDiagnostic(){
   }catch(error){
     output.textContent="テスト失敗："+(error.message||String(error));
   }
+}
+async function runInstagramPrepareDiagnostic(){
+  const output=document.getElementById("ig-prepare-test-result");
+  if(!output)return;
+  const button=output.parentElement?.querySelector('button[onclick="runInstagramPrepareDiagnostic()"]');
+  if(button)button.disabled=true;
+  output.textContent="申請テスト実行中…";
+  const request_key=crypto.randomUUID();
+  const payload={action:"prepare",project_id:"instagram-diagnostic",request_key,
+    caption:"【非公開テスト】申請の保存と二重登録の検査",image_url:"https://example.com/test.jpg"};
+  const log=[];
+  try{
+    const first=await window.requestInstagramGuard(payload);
+    log.push(first.prepared&&!first.duplicate&&!first.published?"✓ 初回登録成功":"✗ 初回登録が想定外");
+    const second=await window.requestInstagramGuard(payload);
+    log.push(second.duplicate===true&&!second.published?"✓ 同一申請の再送を検知":"✗ 重複判定が想定外");
+    try{
+      await window.requestInstagramGuard({...payload,caption:"【変更】別の投稿文"});
+      log.push("✗ 変更後の申請が拒否されませんでした");
+    }catch(err){
+      log.push(String(err.message||err).includes("different content")?"✓ 内容変更を拒否（409）":"△ 変更は拒否されたが理由の確認が必要："+(err.message||err));
+    }
+    output.textContent=log.join("\n")+"\n※公開・承認操作はしていません。";
+  }catch(err){output.textContent=log.join("\n")+"\nテスト中断："+(err.message||String(err));}
+  finally{if(button)button.disabled=false;}
 }
 function renderInstagramWorkspace(w){
   const draft=w.instagramStandalone||{};
