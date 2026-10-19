@@ -564,8 +564,9 @@ async function runInstagramMetaDiagnostic(){
  try{
   if(typeof window.requestInstagramMetaDiagnostic!=="function")throw Error("API未接続");
   const x=await window.requestInstagramMetaDiagnostic();
+  const flag=v=>v===true?"はい":v===false?"いいえ":"確認できません";
   el.textContent=x.token_valid
-   ? "✓ アカウント照会成功\n登録ID一致："+(x.account_matches?"はい":"いいえ")+"\nアカウント種別："+(x.account_type||"確認できません")+"\n投稿権限：未検証"
+   ? "✓ アカウント照会成功\nMetaのidと登録IDの一致："+flag(x.id_field_matches)+"\nMetaのuser_idと登録IDの一致："+flag(x.user_id_field_matches)+"\nアカウント種別："+(x.account_type||"確認できません")+"\n投稿権限：未検証\n※どちらも一致しなければIDは変更せず、接続設定を再確認してください。"
    : "Meta認証を確認できません。HTTP="+(x.meta_http_status||"不明")+" エラーコード="+(x.meta_error_code??"不明");
  }catch(e){el.textContent="確認失敗："+(e.message||String(e));}
 }
