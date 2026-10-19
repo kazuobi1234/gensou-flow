@@ -556,6 +556,10 @@ function renderInstagramDiagnostics(w){
     <p id="ig-claim-test-result" role="status" style="white-space:pre-wrap;margin-top:12px">未実行。テスト申請と承認記録を作成し、公開処理の代わりに状態を1回だけ確定します。</p>
     <div class="approval-actions"><button class="approve-btn" onclick="runInstagramMetaDiagnostic()" type="button">🔍 Metaアカウント接続診断（非公開）</button></div>
     <p id="ig-meta-test-result" role="status" style="white-space:pre-wrap;margin-top:12px">未実行。トークンや秘密鍵は表示しません。投稿権限の完全な検証は行いません。</p>
+    <div style="margin-top:14px"><label for="ig-image-url">🖼️ 公開画像URL検査（非投稿）</label>
+    <input id="ig-image-url" type="url" placeholder="https://lkynzlittlxhbpvnuajw.supabase.co/storage/v1/object/public/instagram-posts/..." style="width:100%;margin:8px 0"/>
+    <button type="button" class="revise-btn" onclick="runInstagramImageCheck()">画像URLを検査（公開なし）</button>
+    <p id="ig-image-check-result" role="status">未検査</p></div>
     <details style="margin-top:12px">
       <summary>📋 Meta投稿権限の確認方法（管理画面）</summary>
       <p>Instagram Login方式の投稿に必要な権限：<code>instagram_business_content_publish</code></p>
@@ -565,6 +569,18 @@ function renderInstagramDiagnostics(w){
       <p>秘密鍵・アクセストークン・ログインコードはスクリーンショットに含めないでください。</p>
     </details>
   </section>`;
+}
+async function runInstagramImageCheck(){
+ const el=document.getElementById("ig-image-check-result");if(!el)return;
+ el.textContent="画像URL確認中…";
+ try{
+  const user=auth.currentUser;if(!user)throw Error("Googleログインが必要です");
+  const token=await user.getIdToken(true);
+  const url=document.getElementById("ig-image-url").value.trim();
+  const response=await fetch("https://lkynzlittlxhbpvnuajw.supabase.co/functions/v1/instagram-image-check",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({action:"check_image",image_url:url})});
+  const result=await response.json();
+  el.textContent=result.ready?"✓ JPEG画像URL・応答・容量を確認。Instagramによる取込は未検証。":"確認できません："+(result.reason||result.error||"通信エラー");
+ }catch(e){el.textContent="検査失敗："+(e.message||String(e))}
 }
 async function runInstagramMetaDiagnostic(){
  const el=document.getElementById("ig-meta-test-result");if(!el)return;
