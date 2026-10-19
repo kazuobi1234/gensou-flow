@@ -1,4 +1,4 @@
-const CACHE_NAME = "ai-company-v24";
+const CACHE_NAME = "ai-company-v25";
 
 const ASSETS = [
   "./",
@@ -33,7 +33,7 @@ self.addEventListener("fetch", (event) => {
   // ページ本体は必ずネットの最新版を先に確認
   if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request)
+      fetch(event.request, { cache: "no-store" })
         .then((response) => {
           const copy = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
