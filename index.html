@@ -469,6 +469,11 @@ const AUTO_RELAY = [
 ];
 function getRelayJobs(masterRequest){
   const normalized=String(masterRequest||"").replace(/\s+/g,"");
+  // Multiple named employee sections are a multi-department request, even when
+  // individual sections contain "のみ", "まで", or "だけ".
+  const explicitSections=[/【(?:調|シラベ)[｜|]/,/【(?:咲|サク)[｜|]/,/【(?:カク|書)[｜|]/,/【(?:暁|ヨウ)[｜|]/,/【(?:葉|ギョウ)[｜|]/,/【(?:まとめ|マトメ)[｜|]/,/【(?:チャッピー)[｜|]/];
+  const assignedCount=explicitSections.filter(re=>re.test(normalized)).length;
+  if(assignedCount>=3)return AUTO_RELAY;
   const only=/だけ|のみ|まで/.test(normalized);
   const researchPlanningOnly=
     /調査(?:と|・)?企画整理まで/.test(normalized) ||
