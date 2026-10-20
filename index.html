@@ -389,7 +389,7 @@ function renderList(){
     </main>
     <div style="margin:16px 20px 90px;display:flex;gap:8px;flex-wrap:wrap;">
       <button onclick="downloadBackup()" style="padding:10px 12px;">バックアップ保存</button>
-      <button onclick="inspectCloudDifference()" style="padding:10px 12px;">🔍 クラウドとの差分を確認（読み取りのみ）</button><button onclick="refreshCloudSync()" style="padding:10px 12px;">🔄 同期状態を再確認</button>
+      <button onclick="inspectCloudDifference()" style="padding:10px 12px;">🔍 クラウドとの差分を確認（読み取りのみ）</button><button onclick="refreshCloudSync()" style="padding:10px 12px;">🔄 同期状態を再確認</button><button onclick="importCloudWithBackup()" style="padding:10px 12px;">📥 クラウドから取り込む（バックアップ必須）</button>
       <p id="cloud-diff-status" role="status" style="width:100%;font-size:13px;white-space:pre-wrap">同期は安全のため停止中。確認ボタンはデータを変更しません。</p>
       <label style="padding:10px 12px;background:#241a30;border-radius:8px;cursor:pointer;">バックアップ復元<input type="file" accept="application/json" style="display:none" onchange="restoreBackupFile(this.files[0]);this.value=''"></label>
       ${state.works.length===0 ? '<button onclick="restoreKogetsuRecovery()" style="padding:10px 12px;">狐月を履歴から復旧</button>' : ''}
@@ -1492,6 +1492,37 @@ async function refreshCloudSync(){
  }
 }
 window.refreshCloudSync=refreshCloudSync;
+async function importCloudWithBackup(){
+ const user=auth.currentUser;if(!user)return alert("ログインしてください");
+ cloudSyncBlocked=true;
+ try{
+  await syncQueue.catch(()=>false);
+  const local=loadWorks(),ref=doc(db,"users",user.uid);
+  const before=await getDoc(ref),cloud=before.exists()&&Array.isArray(before.data().works)?before.data().works:[];
+  if(!cloud.length)return alert("クラウドに取り込めるプロジェクトがありません。");
+  if(syncFingerprint(local)===syncFingerprint(cloud)){
+   cloudBaseline=syncFingerprint(cloud);cloudSyncBlocked=false;
+   return alert("現在の端末とクラウドはすでに一致しています。");
+  }
+  const snapshotName="ai-company-before-cloud-import-"+new Date().toISOString().replace(/[:.]/g,"-")+".json";
+  const data={version:1,exportedAt:new Date().toISOString(),source:"pre-cloud-import",works:local};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob),a=document.createElement("a");
+  a.href=url;a.download=snapshotName;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
+  alert("端末側のバックアップダウンロードを開始しました。ダウンロード一覧でファイルの保存完了を確認してください。");
+  if(!confirm("バックアップ "+snapshotName+" が端末に保存されたことを確認しましたか？ 未確認ならキャンセルしてください。"))return;
+  if(!confirm("クラウドのプロジェクト "+cloud.length+"件でこの端末のデータを置き換えます。端末固有の未同期の変更は上書きされます。実行しますか？"))return;
+  const latest=await getDoc(ref),latestWorks=latest.exists()&&Array.isArray(latest.data().works)?latest.data().works:[];
+  if(syncFingerprint(cloud)!==syncFingerprint(latestWorks))return alert("確認中にクラウドが変更されました。取り込みを中止しました。");
+  if(!saveWorks(cloud))return alert("端末への保存に失敗しました。取り込みを中止しました。");
+  state.works=cloud;state.openId=null;
+  cloudBaseline=syncFingerprint(cloud);cloudSyncBlocked=false;
+  render();renderAccountStatus(user);
+  alert("クラウドのデータを端末へ取り込みました。バックアップは削除しないでください。");
+ }catch(e){cloudSyncBlocked=true;alert("取り込みを中止しました："+(e.message||String(e)));}
+}
+window.importCloudWithBackup=importCloudWithBackup;
+
 onAuthStateChanged(auth, async (user) => {
   const app = document.getElementById("app");
 
