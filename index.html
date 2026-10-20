@@ -304,7 +304,7 @@ function render(){
   app.innerHTML = state.openId ? renderDetail() : renderList();
   if(state.showNew) app.innerHTML += renderNewModal();
   if(state.confirm) app.innerHTML += renderConfirmModal();
-  if(!state.openId && typeof window.refreshRemoteOnReturn==="function" && remoteRefreshNeeded) queueMicrotask(()=>window.refreshRemoteOnReturn());
+  if(!state.openId && typeof window.refreshRemoteOnReturn==="function") queueMicrotask(()=>window.refreshRemoteOnReturn());
 }
 
 function moonHtml(ratio, size){
