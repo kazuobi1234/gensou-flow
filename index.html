@@ -250,7 +250,7 @@ let state = {
 
 function persist(){
   const ok = saveWorks(state.works);
-  saveWorksToCloud(state.works);
+  enqueueCloudWrite(state.works);
   const toastArea = document.getElementById("toast-area");
   toastArea.innerHTML = ok ? "" : `
     <div class="toast">
@@ -283,7 +283,7 @@ function normalizeWorks(){
   });
   if(migrated){
     saveWorks(state.works);
-    saveWorksToCloud(state.works);
+    enqueueCloudWrite(state.works);
   }
 }
 function render(){
@@ -327,7 +327,7 @@ async function restoreBackupFile(file){
     if(!confirm("現在のプロジェクトをバックアップ内容で復元しますか？")) return;
     state.works=works; state.openId=null;
     saveWorks(state.works);
-    await saveWorksToCloud(state.works);
+    await enqueueCloudWrite(state.works);
     render(); renderAccountStatus(auth.currentUser);
     alert("バックアップから復元しました。");
   }catch(e){ alert("復元に失敗しました："+e.message); }
@@ -377,7 +377,7 @@ function renderList(){
     </main>
     <div style="margin:16px 20px 90px;display:flex;gap:8px;flex-wrap:wrap;">
       <button onclick="downloadBackup()" style="padding:10px 12px;">バックアップ保存</button>
-      <button onclick="inspectCloudDifference()" style="padding:10px 12px;">🔍 クラウドとの差分を確認（読み取りのみ）</button>
+      <button onclick="inspectCloudDifference()" style="padding:10px 12px;">🔍 クラウドとの差分を確認（読み取りのみ）</button><button onclick="refreshCloudSync()" style="padding:10px 12px;">🔄 同期状態を再確認</button>
       <p id="cloud-diff-status" role="status" style="width:100%;font-size:13px;white-space:pre-wrap">同期は安全のため停止中。確認ボタンはデータを変更しません。</p>
       <label style="padding:10px 12px;background:#241a30;border-radius:8px;cursor:pointer;">バックアップ復元<input type="file" accept="application/json" style="display:none" onchange="restoreBackupFile(this.files[0]);this.value=''"></label>
       ${state.works.length===0 ? '<button onclick="restoreKogetsuRecovery()" style="padding:10px 12px;">狐月を履歴から復旧</button>' : ''}
@@ -1228,7 +1228,7 @@ if ("serviceWorker" in navigator) {
 </script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, runTransaction } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 
   const firebaseConfig = {
@@ -1407,30 +1407,70 @@ async function inspectCloudDifference(){
  }catch(e){out.textContent="確認できません："+(e.message||String(e))}
 }
 window.inspectCloudDifference=inspectCloudDifference;
-async function saveWorksToCloud(works) {
-  // Avoid overwriting another device's latest progress. Manual reconciliation required.
-  if(cloudSyncBlocked) { console.warn("Cloud writes paused to protect cross-device data"); return false; }
+let cloudBaseline = null;
+let syncQueue = Promise.resolve();
+function enqueueCloudWrite(works){
+ const snapshot=JSON.parse(JSON.stringify(works));
+ syncQueue=syncQueue.catch(()=>false).then(()=>saveWorksToCloud(snapshot));
+ return syncQueue;
+}
+async function saveWorksToCloud(works){
+ if(cloudSyncBlocked || cloudBaseline===null)return false;
+ const user=auth.currentUser;if(!user)return false;
+ const expected=cloudBaseline;
+ try{
+  const ref=doc(db,"users",user.uid);
+  await runTransaction(db,async(tx)=>{
+   const snap=await tx.get(ref);
+   const remote=snap.exists()&&Array.isArray(snap.data().works)?snap.data().works:[];
+   if(JSON.stringify(remote)!==expected)throw Error("SYNC_CONFLICT");
+   tx.set(ref,{works}, {merge:true});
+  });
+  cloudBaseline=JSON.stringify(works);
+  return true;
+ }catch(e){
+  cloudSyncBlocked=true;
+  console.warn("Cloud synchronization paused",e);
+  alert("⚠️ 他の端末またはクラウドの内容が変わったため同期を停止しました。データを上書きしていません。両端末のバックアップを保存し、差分確認を行ってください。");
   return false;
+ }
 }
 window.saveWorksToCloud=saveWorksToCloud;
-async function loadWorksFromCloud() {
+window.enqueueCloudWrite=enqueueCloudWrite;
+async function loadWorksFromCloud(){
  const user=auth.currentUser;if(!user)return false;
- try {
-   const localWorks=loadWorks();
-   const snap=await getDoc(doc(db,"users",user.uid));
-   const cloudWorks=snap.exists()&&Array.isArray(snap.data().works)?snap.data().works:[];
-   // Never overwrite local data or Firestore automatically.
-   if(localWorks.length>0){
-     state.works=localWorks;
-     if(cloudWorks.length>0 && JSON.stringify(localWorks)!==JSON.stringify(cloudWorks))
-       console.warn("端末とクラウドのデータが異なるため、自動同期は停止しています。");
-   } else if(cloudWorks.length>0) {
-     state.works=cloudWorks;
-     saveWorks(state.works);
-   } else state.works=[];
-   render();renderAccountStatus(user);return true;
- }catch(e){console.error("クラウド読み込みエラー",e);return false;}
+ cloudSyncBlocked=true;cloudBaseline=null;
+ try{
+  const local=loadWorks();
+  const snap=await getDoc(doc(db,"users",user.uid));
+  const remote=snap.exists()&&Array.isArray(snap.data().works)?snap.data().works:[];
+  // Enable optimistic writes only if both sides match. Never overwrite divergent data.
+  if(local.length===0 && remote.length>0){state.works=remote;saveWorks(remote);}
+  else state.works=local;
+  if(JSON.stringify(state.works)===JSON.stringify(remote)){
+   cloudBaseline=JSON.stringify(remote);
+   cloudSyncBlocked=false;
+  }else console.warn("Different local/cloud data; synchronization remains paused");
+  render();renderAccountStatus(user);return true;
+ }catch(e){console.error("クラウド読込エラー",e);return false;}
 }
+async function refreshCloudSync(){
+ if(!auth.currentUser)return alert("ログインしてください");
+ await syncQueue.catch(()=>false);
+ const local=loadWorks();
+ const snap=await getDoc(doc(db,"users",auth.currentUser.uid));
+ const remote=snap.exists()&&Array.isArray(snap.data().works)?snap.data().works:[];
+ if(JSON.stringify(local)===JSON.stringify(remote)){
+  cloudBaseline=JSON.stringify(remote);cloudSyncBlocked=false;
+  alert("✓ 端末とクラウドが一致。競合防止付き同期を再開しました。");
+ }else{
+  cloudSyncBlocked=true;
+  if(!confirm("端末とクラウドに差分があります。クラウドの内容をこの端末へ取り込みますか？ 先にバックアップを保管している場合のみOKを押してください。"))return;
+  saveWorks(remote);state.works=remote;state.openId=null;cloudBaseline=JSON.stringify(remote);cloudSyncBlocked=false;
+  render();alert("クラウドの内容を端末へ取り込みました。");
+ }
+}
+window.refreshCloudSync=refreshCloudSync;
 onAuthStateChanged(auth, async (user) => {
   const app = document.getElementById("app");
 
