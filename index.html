@@ -1371,6 +1371,16 @@ async function requestInstagramImageUpload(file){
 }
 window.requestInstagramImageUpload=requestInstagramImageUpload;
   
+function syncCanonical(value){
+ if(Array.isArray(value))return value.map(syncCanonical);
+ if(value&&typeof value==="object"){
+  const out={};
+  for(const key of Object.keys(value).sort())if(value[key]!==undefined)out[key]=syncCanonical(value[key]);
+  return out;
+ }
+ return value;
+}
+function syncFingerprint(value){return JSON.stringify(syncCanonical(value));}
 let cloudSyncBlocked = true; // Fail closed until user has safely resolved divergent device data.
 async function inspectCloudDifference(){
  const out=document.getElementById("cloud-diff-status");if(!out)return;
@@ -1385,7 +1395,7 @@ async function inspectCloudDifference(){
   const names=new Set([...lc.keys(),...cc.keys()]);
   const changes=[];
   function compare(x,y,path,depth){
-    if(JSON.stringify(x)===JSON.stringify(y))return;
+    if(syncFingerprint(x)===syncFingerprint(y))return;
     if(depth>7){changes.push(path+"：詳細差分あり");return;}
     if(Array.isArray(x)&&Array.isArray(y)){
       for(let i=0;i<Math.max(x.length,y.length);i++)compare(x[i],y[i],path+"["+i+"]",depth+1);
@@ -1410,7 +1420,7 @@ window.inspectCloudDifference=inspectCloudDifference;
 let cloudBaseline = null;
 let syncQueue = Promise.resolve();
 function enqueueCloudWrite(works){
- const snapshot=JSON.parse(JSON.stringify(works));
+ const snapshot=JSON.parse(syncFingerprint(works));
  syncQueue=syncQueue.catch(()=>false).then(()=>saveWorksToCloud(snapshot));
  return syncQueue;
 }
@@ -1423,10 +1433,10 @@ async function saveWorksToCloud(works){
   await runTransaction(db,async(tx)=>{
    const snap=await tx.get(ref);
    const remote=snap.exists()&&Array.isArray(snap.data().works)?snap.data().works:[];
-   if(JSON.stringify(remote)!==expected)throw Error("SYNC_CONFLICT");
+   if(syncFingerprint(remote)!==expected)throw Error("SYNC_CONFLICT");
    tx.set(ref,{works}, {merge:true});
   });
-  cloudBaseline=JSON.stringify(works);
+  cloudBaseline=syncFingerprint(works);
   return true;
  }catch(e){
   cloudSyncBlocked=true;
@@ -1447,8 +1457,8 @@ async function loadWorksFromCloud(){
   // Enable optimistic writes only if both sides match. Never overwrite divergent data.
   if(local.length===0 && remote.length>0){state.works=remote;saveWorks(remote);}
   else state.works=local;
-  if(JSON.stringify(state.works)===JSON.stringify(remote)){
-   cloudBaseline=JSON.stringify(remote);
+  if(syncFingerprint(state.works)===syncFingerprint(remote)){
+   cloudBaseline=syncFingerprint(remote);
    cloudSyncBlocked=false;
   }else console.warn("Different local/cloud data; synchronization remains paused");
   render();renderAccountStatus(user);return true;
@@ -1460,14 +1470,12 @@ async function refreshCloudSync(){
  const local=loadWorks();
  const snap=await getDoc(doc(db,"users",auth.currentUser.uid));
  const remote=snap.exists()&&Array.isArray(snap.data().works)?snap.data().works:[];
- if(JSON.stringify(local)===JSON.stringify(remote)){
-  cloudBaseline=JSON.stringify(remote);cloudSyncBlocked=false;
+ if(syncFingerprint(local)===syncFingerprint(remote)){
+  cloudBaseline=syncFingerprint(remote);cloudSyncBlocked=false;
   alert("✓ 端末とクラウドが一致。競合防止付き同期を再開しました。");
  }else{
   cloudSyncBlocked=true;
-  if(!confirm("端末とクラウドに差分があります。クラウドの内容をこの端末へ取り込みますか？ 先にバックアップを保管している場合のみOKを押してください。"))return;
-  saveWorks(remote);state.works=remote;state.openId=null;cloudBaseline=JSON.stringify(remote);cloudSyncBlocked=false;
-  render();alert("クラウドの内容を端末へ取り込みました。");
+  alert("端末とクラウドに内容の差分があります。安全のため同期を停止しました。詳細差分を確認してください。自動上書きは行いません。");
  }
 }
 window.refreshCloudSync=refreshCloudSync;
