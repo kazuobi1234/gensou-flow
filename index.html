@@ -304,6 +304,7 @@ function render(){
   app.innerHTML = state.openId ? renderDetail() : renderList();
   if(state.showNew) app.innerHTML += renderNewModal();
   if(state.confirm) app.innerHTML += renderConfirmModal();
+  if(!state.openId && typeof window.refreshRemoteOnReturn==="function" && remoteRefreshNeeded) queueMicrotask(()=>window.refreshRemoteOnReturn());
 }
 
 function moonHtml(ratio, size){
@@ -1241,7 +1242,7 @@ if ("serviceWorker" in navigator) {
 </script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc, runTransaction } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, runTransaction, onSnapshot } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 
   const firebaseConfig = {
@@ -1431,10 +1432,14 @@ async function inspectCloudDifference(){
 }
 window.inspectCloudDifference=inspectCloudDifference;
 let cloudBaseline = null;
+let liveSyncStop=null;
+let pendingCloudWrites=0;
+let remoteRefreshNeeded=false;
 let syncQueue = Promise.resolve();
 function enqueueCloudWrite(works){
  const snapshot=JSON.parse(syncFingerprint(works));
- syncQueue=syncQueue.catch(()=>false).then(()=>saveWorksToCloud(snapshot));
+ pendingCloudWrites++;
+ syncQueue=syncQueue.catch(()=>false).then(()=>saveWorksToCloud(snapshot)).finally(()=>{pendingCloudWrites=Math.max(0,pendingCloudWrites-1)});
  return syncQueue;
 }
 async function saveWorksToCloud(works){
@@ -1477,6 +1482,38 @@ async function loadWorksFromCloud(){
   render();renderAccountStatus(user);return true;
  }catch(e){console.error("クラウド読込エラー",e);return false;}
 }
+function applyRemoteSafely(remote){
+ if(cloudSyncBlocked||cloudBaseline===null||pendingCloudWrites>0)return false;
+ const local=loadWorks();
+ const localHash=syncFingerprint(local),remoteHash=syncFingerprint(remote);
+ if(localHash===remoteHash){cloudBaseline=remoteHash;remoteRefreshNeeded=false;return true;}
+ if(localHash!==cloudBaseline){cloudSyncBlocked=true;console.warn("Local unsynced changes: automatic import blocked");return false;}
+ if(state.openId!==null||state.showNew||state.confirm){remoteRefreshNeeded=true;return false;}
+ if(!saveWorks(remote)){cloudSyncBlocked=true;return false;}
+ state.works=remote;
+ cloudBaseline=remoteHash;remoteRefreshNeeded=false;
+ render();renderAccountStatus(auth.currentUser);
+ return true;
+}
+function startLiveCloudSync(user){
+ if(liveSyncStop){liveSyncStop();liveSyncStop=null;}
+ let first=true;
+ liveSyncStop=onSnapshot(doc(db,"users",user.uid),snap=>{
+  if(snap.metadata.hasPendingWrites)return;
+  const remote=snap.exists()&&Array.isArray(snap.data().works)?snap.data().works:[];
+  if(first){first=false;return;}
+  applyRemoteSafely(remote);
+ },error=>{cloudSyncBlocked=true;console.error("Cloud listener stopped",error)});
+}
+async function refreshRemoteOnReturn(){
+ if(!remoteRefreshNeeded||state.openId!==null||cloudSyncBlocked||!auth.currentUser)return;
+ await syncQueue.catch(()=>false);
+ try{
+  const snap=await getDoc(doc(db,"users",auth.currentUser.uid));
+  applyRemoteSafely(snap.exists()&&Array.isArray(snap.data().works)?snap.data().works:[]);
+ }catch(e){console.warn("Unable to refresh",e)}
+}
+window.refreshRemoteOnReturn=refreshRemoteOnReturn;
 async function refreshCloudSync(){
  if(!auth.currentUser)return alert("ログインしてください");
  await syncQueue.catch(()=>false);
@@ -1529,9 +1566,11 @@ onAuthStateChanged(auth, async (user) => {
   if (user) {
    console.log("ログイン中:", user.email);
 await loadWorksFromCloud();
+startLiveCloudSync(user);
 render();
 renderAccountStatus(user);
   } else {
+    if(liveSyncStop){liveSyncStop();liveSyncStop=null;}cloudSyncBlocked=true;cloudBaseline=null;
     console.log("未ログイン");
     app.innerHTML = `
       <div style="padding:32px; text-align:center;">
