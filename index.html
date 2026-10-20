@@ -377,6 +377,8 @@ function renderList(){
     </main>
     <div style="margin:16px 20px 90px;display:flex;gap:8px;flex-wrap:wrap;">
       <button onclick="downloadBackup()" style="padding:10px 12px;">バックアップ保存</button>
+      <button onclick="inspectCloudDifference()" style="padding:10px 12px;">🔍 クラウドとの差分を確認（読み取りのみ）</button>
+      <p id="cloud-diff-status" role="status" style="width:100%;font-size:13px;white-space:pre-wrap">同期は安全のため停止中。確認ボタンはデータを変更しません。</p>
       <label style="padding:10px 12px;background:#241a30;border-radius:8px;cursor:pointer;">バックアップ復元<input type="file" accept="application/json" style="display:none" onchange="restoreBackupFile(this.files[0]);this.value=''"></label>
       ${state.works.length===0 ? '<button onclick="restoreKogetsuRecovery()" style="padding:10px 12px;">狐月を履歴から復旧</button>' : ''}
     </div>
@@ -1370,6 +1372,20 @@ async function requestInstagramImageUpload(file){
 window.requestInstagramImageUpload=requestInstagramImageUpload;
   
 let cloudSyncBlocked = true; // Fail closed until user has safely resolved divergent device data.
+async function inspectCloudDifference(){
+ const out=document.getElementById("cloud-diff-status");if(!out)return;
+ out.textContent="クラウドの状況を確認しています…";
+ try{
+   const user=auth.currentUser;if(!user)throw Error("ログインしてください");
+   const snap=await getDoc(doc(db,"users",user.uid));
+   const local=loadWorks(), cloud=snap.exists()&&Array.isArray(snap.data().works)?snap.data().works:[];
+   const info=works=>works.map(w=>({name:w.name,done:Array.isArray(w.steps)?w.steps.filter(Boolean).length:0,steps:Array.isArray(w.steps)?w.steps.length:0,id:w.id}));
+   const localInfo=info(local),cloudInfo=info(cloud);
+   const same=JSON.stringify(local)===JSON.stringify(cloud);
+   out.textContent="端末："+localInfo.map(w=>w.name+" "+w.done+"/"+w.steps).join("、")+"\nクラウド："+cloudInfo.map(w=>w.name+" "+w.done+"/"+w.steps).join("、")+"\n比較："+(same?"データ一致":"差分あり")+"\n※読み取りのみ。同期・上書きはしていません。";
+ }catch(e){out.textContent="確認できません："+(e.message||String(e))}
+}
+window.inspectCloudDifference=inspectCloudDifference;
 async function saveWorksToCloud(works) {
   // Avoid overwriting another device's latest progress. Manual reconciliation required.
   if(cloudSyncBlocked) { console.warn("Cloud writes paused to protect cross-device data"); return false; }
@@ -1386,7 +1402,7 @@ async function loadWorksFromCloud() {
    if(localWorks.length>0){
      state.works=localWorks;
      if(cloudWorks.length>0 && JSON.stringify(localWorks)!==JSON.stringify(cloudWorks))
-       alert("⚠️ 端末とクラウドの進捗が異なります。自動同期は安全のため一時停止中です。両端末でバックアップ保存を行い、復旧するまで作業を進めないでください。");
+       console.warn("端末とクラウドのデータが異なるため、自動同期は停止しています。");
    } else if(cloudWorks.length>0) {
      state.works=cloudWorks;
      saveWorks(state.works);
