@@ -1374,15 +1374,36 @@ window.requestInstagramImageUpload=requestInstagramImageUpload;
 let cloudSyncBlocked = true; // Fail closed until user has safely resolved divergent device data.
 async function inspectCloudDifference(){
  const out=document.getElementById("cloud-diff-status");if(!out)return;
- out.textContent="クラウドの状況を確認しています…";
+ out.textContent="端末とクラウドを読み取り中…";
  try{
-   const user=auth.currentUser;if(!user)throw Error("ログインしてください");
-   const snap=await getDoc(doc(db,"users",user.uid));
-   const local=loadWorks(), cloud=snap.exists()&&Array.isArray(snap.data().works)?snap.data().works:[];
-   const info=works=>works.map(w=>({name:w.name,done:Array.isArray(w.steps)?w.steps.filter(Boolean).length:0,steps:Array.isArray(w.steps)?w.steps.length:0,id:w.id}));
-   const localInfo=info(local),cloudInfo=info(cloud);
-   const same=JSON.stringify(local)===JSON.stringify(cloud);
-   out.textContent="端末："+localInfo.map(w=>w.name+" "+w.done+"/"+w.steps).join("、")+"\nクラウド："+cloudInfo.map(w=>w.name+" "+w.done+"/"+w.steps).join("、")+"\n比較："+(same?"データ一致":"差分あり")+"\n※読み取りのみ。同期・上書きはしていません。";
+  const user=auth.currentUser;if(!user)throw Error("ログインしてください");
+  const snap=await getDoc(doc(db,"users",user.uid));
+  const local=loadWorks(),cloud=snap.exists()&&Array.isArray(snap.data().works)?snap.data().works:[];
+  const summary=w=>w.name+" "+(Array.isArray(w.steps)?w.steps.filter(Boolean).length:0)+"/13";
+  const lines=["【端末】"+(local.map(summary).join("、")||"なし"),"【クラウド】"+(cloud.map(summary).join("、")||"なし")];
+  const lc=new Map(local.map(w=>[String(w.id),w])),cc=new Map(cloud.map(w=>[String(w.id),w]));
+  const names=new Set([...lc.keys(),...cc.keys()]);
+  const changes=[];
+  function compare(x,y,path,depth){
+    if(JSON.stringify(x)===JSON.stringify(y))return;
+    if(depth>7){changes.push(path+"：詳細差分あり");return;}
+    if(Array.isArray(x)&&Array.isArray(y)){
+      for(let i=0;i<Math.max(x.length,y.length);i++)compare(x[i],y[i],path+"["+i+"]",depth+1);
+    }else if(x&&y&&typeof x==="object"&&typeof y==="object"){
+      for(const k of new Set([...Object.keys(x),...Object.keys(y)]))compare(x[k],y[k],path+"."+k,depth+1);
+    }else changes.push(path+(x===undefined?"：端末に項目なし":y===undefined?"：クラウドに項目なし":"：内容が異なる"));
+  }
+  for(const id of names){
+    const x=lc.get(id),y=cc.get(id);
+    const name=x?.name||y?.name||"名称不明";
+    if(!x||!y){changes.push(name+"："+(!x?"端末にのみ存在しない":"クラウドにのみ存在しない"));continue;}
+    compare(x,y,name,0);
+  }
+  lines.push("【詳細差分】"+(changes.length?changes.length+"項目":"0項目（一致）"));
+  lines.push(...changes.slice(0,60));
+  if(changes.length>60)lines.push("ほか "+(changes.length-60)+"項目（表示省略）");
+  lines.push("※値そのものや秘密情報は表示しません。読み取りのみ・同期停止中。");
+  out.textContent=lines.join("\n");
  }catch(e){out.textContent="確認できません："+(e.message||String(e))}
 }
 window.inspectCloudDifference=inspectCloudDifference;
