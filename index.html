@@ -1362,7 +1362,8 @@ async function requestShirabeResearch(productName, request) {
     if (response.status === 401) throw new Error("本人認証に失敗しました。いったん再ログインしてください。");
     const upstream=Number.isInteger(data.status)?data.status:null;
     const category=upstream===429?"API利用制限":upstream===401||upstream===403?"Gemini認証・アクセス権":upstream===404?"モデルまたはAPIパス":upstream===400?"APIリクエスト不正":upstream>=500?"Geminiサーバー側エラー":response.status===503?"サーバー設定":response.status===502?"上流API失敗（詳細未特定）":"その他・原因未特定";
-    const diagnostic="シラベAPI診断：HTTP "+response.status+(upstream?" / Gemini HTTP "+upstream:"")+" / "+category;
+    const upstreamCode=typeof data.upstreamCode==="string" && /^[A-Z_]{3,50}$/.test(data.upstreamCode)?data.upstreamCode:"未取得";
+    const diagnostic="シラベAPI診断：HTTP "+response.status+(upstream?" / Gemini HTTP "+upstream:"")+" / "+category+" / Gemini分類コード "+upstreamCode;
     throw new Error((data.error||"シラベの調査に失敗しました")+"\n"+diagnostic+"\n※キー・認証情報は表示しません。再実行前に原因を確認してください。");
   }
   if (!data.result) throw new Error("シラベから調査結果を取得できませんでした。");
