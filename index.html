@@ -1070,16 +1070,38 @@ function renderShirabePanel(w){
       <label>調査依頼</label>
       <textarea id="shirabe-request" placeholder="例：海外で和柄スマホ壁紙の需要・競合・価格帯を調査">${escapeHtml(s.request||"")}</textarea>
       <div class="ai-status">状態：${escapeHtml(s.status||"未依頼")}</div>
+      <p id="shirabe-diagnostic-result" role="status" style="white-space:pre-wrap;font-size:13px">診断未実施。AI社員の成果や進捗は変更しません。</p>
       <label>調査結果</label>
       <textarea id="shirabe-result" placeholder="シラベの調査結果をここに保存">${escapeHtml(s.result||"")}</textarea>
       <div class="ai-actions">
         <button id="shirabe-run" class="ai-run" onclick="runShirabe('${w.id}')">🔎 シラベに調査を依頼</button>
+        <button type="button" class="ai-save" onclick="diagnoseShirabeOnce('${w.id}')">🩺 シラベ接続を1回診断（再試行なし）</button>
         <button class="ai-save" onclick="saveShirabe('${w.id}')">シラベ情報を保存</button>
         <button class="ai-complete" onclick="completeShirabe('${w.id}')">調査完了 → サクへ</button>
       </div>
     </section>`;
 }
 
+
+let shirabeDiagnosticBusy=false;
+async function diagnoseShirabeOnce(workId){
+  const out=document.getElementById("shirabe-diagnostic-result");
+  const w=state.works.find(x=>x.id===workId);
+  if(!out||!w||shirabeDiagnosticBusy)return;
+  if(!confirm("シラベAPIへテストを1回だけ送ります（再試行なし）。API利用量が発生する可能性があります。プロジェクトの進捗・成果は変更しません。続けますか？"))return;
+  shirabeDiagnosticBusy=true;
+  out.textContent="接続診断中（1回のみ）…";
+  try{
+    const result=await window.requestShirabeResearch("接続診断","接続確認です。短く『接続成功』だけ回答してください。市場調査は不要です。");
+    out.textContent=result?"✅ シラベAPIが応答しました。実際の市場調査の成功までは保証しません。":"⚠️ 応答内容が空です。";
+  }catch(error){
+    const msg=String(error?.message||"原因未特定");
+    const http=msg.match(/シラベAPI診断：HTTP\s*(\d{3})(?:\s*\/\s*Gemini HTTP\s*(\d{3}))?/);
+    const category=http?.[2]==="503"?"Gemini側503（処理不可）":http?.[2]==="429"?"Gemini側429（利用制限）":http?.[2]==="404"?"Gemini側404（モデル・経路）":http?.[2]==="403"?"Gemini側403（権限）":"詳細は確認できません";
+    out.textContent="⚠️ 診断失敗\nアプリ側HTTP："+(http?.[1]||"確認できません")+"\nGemini側HTTP："+(http?.[2]||"確認できません")+"\n分類："+category+"\n秘密情報は表示していません。";
+  }finally{shirabeDiagnosticBusy=false;}
+}
+window.diagnoseShirabeOnce=diagnoseShirabeOnce;
 
 const EMPLOYEE_STEP_MAP = {
   saku:[2,4],
