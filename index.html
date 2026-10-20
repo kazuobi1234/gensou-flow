@@ -559,7 +559,7 @@ function renderInstagramDiagnostics(w){
     <div style="margin-top:14px"><label for="ig-diagnostic-image-url">🖼️ 公開画像URL検査（非投稿）</label>
     <input id="ig-diagnostic-image-url" type="url" placeholder="ここをタップして公開URLを貼り付け（未入力）" style="width:100%;margin:8px 0"/>
     <button type="button" class="revise-btn" onclick="runInstagramImageCheck()">画像URLを検査（公開なし）</button>
-    <p id="ig-image-check-result" role="status">未検査</p></div>
+    <p id="ig-image-check-result" role="status">未検査</p><div style="margin-top:14px;border-top:1px solid #644a88;padding-top:12px"><label for="ig-convert-source">🔄 PNGからJPEGに変換し別ファイル保存（非投稿）</label><p>端末から画像を選択。元画像は変更しません。</p><input id="ig-convert-source" type="file" accept="image/png,image/webp,image/jpeg" style="display:block;margin:8px 0"/><button type="button" class="revise-btn" onclick="runInstagramJpegConversion()">JPEGに変換して保存（公開しない）</button><p id="ig-convert-result" role="status" style="white-space:pre-wrap">未実行</p></div></div>
     <details style="margin-top:12px">
       <summary>📋 Meta投稿権限の確認方法（管理画面）</summary>
       <p>Instagram Login方式の投稿に必要な権限：<code>instagram_business_content_publish</code></p>
@@ -569,6 +569,37 @@ function renderInstagramDiagnostics(w){
       <p>秘密鍵・アクセストークン・ログインコードはスクリーンショットに含めないでください。</p>
     </details>
   </section>`;
+}
+async function runInstagramJpegConversion(){
+ const out=document.getElementById("ig-convert-result"),input=document.getElementById("ig-convert-source");
+ const file=input?.files?.[0];if(!out||!input)return;
+ if(!file){out.textContent="元の画像ファイルを選んでください。";return;}
+ if(!["image/png","image/webp","image/jpeg"].includes(file.type)||file.size>10*1024*1024){out.textContent="10MB以下のPNG・WebP・JPEG画像を選んでください。";return;}
+ const button=out.parentElement?.querySelector('button[onclick="runInstagramJpegConversion()"]');
+ if(button)button.disabled=true;
+ let bitmap;
+ try{
+  if(typeof window.requestInstagramImageUpload!=="function")throw Error("アップロード機能が未接続です");
+  out.textContent="変換中…";
+  bitmap=await createImageBitmap(file);
+  if(!bitmap.width||!bitmap.height||bitmap.width*bitmap.height>36000000)throw Error("画像サイズに対応していません");
+  const ratio=Math.min(1,2048/Math.max(bitmap.width,bitmap.height));
+  const canvas=document.createElement("canvas");
+  canvas.width=Math.max(1,Math.round(bitmap.width*ratio));canvas.height=Math.max(1,Math.round(bitmap.height*ratio));
+  const ctx=canvas.getContext("2d");if(!ctx)throw Error("画像処理に失敗しました");
+  ctx.fillStyle="#ffffff";ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);
+  const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",0.86));
+  if(!blob||blob.type!=="image/jpeg"||blob.size>8000000)throw Error("JPEGを生成できません");
+  out.textContent="JPEGを別ファイルとしてSupabaseに保存中…";
+  const jpeg=new File([blob],file.name.replace(/\.[^.]+$/,"")+"-instagram.jpg",{type:"image/jpeg"});
+  const result=await window.requestInstagramImageUpload(jpeg);
+  if(!result?.image_url)throw Error("保存先URLが取得できません");
+  const urlInput=document.getElementById("ig-diagnostic-image-url");
+  if(urlInput)urlInput.value=result.image_url;
+  out.textContent="✓ JPEG保存完了。元のPNGは残っています。\n"+canvas.width+"×"+canvas.height+" / "+(blob.size/1048576).toFixed(2)+"MB\n上のURL欄に保存先を入力済みです。「画像URLを検査」を押してください。\nInstagramへの投稿はしていません。";
+ }catch(e){out.textContent="変換・保存に失敗："+(e.message||String(e))}
+ finally{bitmap?.close?.();if(button)button.disabled=false}
 }
 async function runInstagramImageCheck(){
  const el=document.getElementById("ig-image-check-result");if(!el)return;
