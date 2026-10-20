@@ -302,6 +302,7 @@ function render(){
   normalizeWorks();
   const app = document.getElementById("app");
   app.innerHTML = state.openId ? renderDetail() : renderList();
+  if(typeof window.showSyncStatus==="function") window.showSyncStatus();
   if(state.showNew) app.innerHTML += renderNewModal();
   if(state.confirm) app.innerHTML += renderConfirmModal();
   if(!state.openId && typeof window.refreshRemoteOnReturn==="function") queueMicrotask(()=>window.refreshRemoteOnReturn());
@@ -385,6 +386,7 @@ function renderList(){
       <div id="account-status" style="font-size:12px;opacity:.75;margin-top:6px;">アカウント確認中…</div>
       <button id="logout-button" onclick="logoutFromGoogle()" style="display:none;margin-top:8px;">ログアウト</button>
     </header>
+    <section style="margin:12px 20px;padding:14px;border:1px solid #67547f;border-radius:12px"><strong>☁️ 同期ステータス</strong><div id="sync-live-status" role="status" style="margin-top:8px">確認中（未検証）</div><div id="sync-last-check" style="font-size:12px;opacity:.75;margin-top:5px">最終確認：未確認</div><div style="font-size:12px;opacity:.75;margin-top:4px">競合がある場合は自動同期を停止します。</div></section>
     <main>
       ${state.works.length===0 ? `<div class="empty">まだプロジェクトがありません。<br>右下の「＋」から最初のプロジェクトを作成しましょう。</div>` : items}
     </main>
@@ -1395,6 +1397,19 @@ function syncCanonical(value){
  return value;
 }
 function syncFingerprint(value){return JSON.stringify(syncCanonical(value));}
+let syncDisplayState="確認中（未検証）";
+let syncLastVerified=null;
+function showSyncStatus(){
+ const a=document.getElementById("sync-live-status"),b=document.getElementById("sync-last-check");
+ if(a)a.textContent=syncDisplayState;
+ if(b)b.textContent="最終確認："+(syncLastVerified?new Date(syncLastVerified).toLocaleString("ja-JP"):"未確認");
+}
+window.showSyncStatus=showSyncStatus;
+function setSyncStatus(message,verified=false){
+ syncDisplayState=message;
+ if(verified)syncLastVerified=Date.now();
+ showSyncStatus();
+}
 let cloudSyncBlocked = true; // Fail closed until user has safely resolved divergent device data.
 async function inspectCloudDifference(){
  const out=document.getElementById("cloud-diff-status");if(!out)return;
@@ -1428,6 +1443,8 @@ async function inspectCloudDifference(){
   if(changes.length>60)lines.push("ほか "+(changes.length-60)+"項目（表示省略）");
   lines.push("※値そのものや秘密情報は表示しません。読み取りのみ・同期停止中。");
   out.textContent=lines.join("\n");
+  if(changes.length)setSyncStatus("⚠️ 差分あり（同期状態を確認してください）");
+  else setSyncStatus(cloudSyncBlocked?"⏸️ データ一致・同期停止中":"✅ 同期済み（差分確認完了）",true);
  }catch(e){out.textContent="確認できません："+(e.message||String(e))}
 }
 window.inspectCloudDifference=inspectCloudDifference;
@@ -1443,9 +1460,10 @@ function enqueueCloudWrite(works){
  return syncQueue;
 }
 async function saveWorksToCloud(works){
- if(cloudSyncBlocked || cloudBaseline===null)return false;
+ if(cloudSyncBlocked || cloudBaseline===null){setSyncStatus("⚠️ 同期停止中（確認が必要）");return false;}
  const user=auth.currentUser;if(!user)return false;
  const expected=cloudBaseline;
+ setSyncStatus("🔄 同期中…");
  try{
   const ref=doc(db,"users",user.uid);
   await runTransaction(db,async(tx)=>{
@@ -1455,9 +1473,11 @@ async function saveWorksToCloud(works){
    tx.set(ref,{works}, {merge:true});
   });
   cloudBaseline=syncFingerprint(works);
+  setSyncStatus("✅ 同期済み（クラウド保存確認）",true);
   return true;
  }catch(e){
   cloudSyncBlocked=true;
+  setSyncStatus("⚠️ 競合または保存失敗：同期停止中");
   console.warn("Cloud synchronization paused",e);
   alert("⚠️ 他の端末またはクラウドの内容が変わったため同期を停止しました。データを上書きしていません。両端末のバックアップを保存し、差分確認を行ってください。");
   return false;
@@ -1478,7 +1498,8 @@ async function loadWorksFromCloud(){
   if(syncFingerprint(state.works)===syncFingerprint(remote)){
    cloudBaseline=syncFingerprint(remote);
    cloudSyncBlocked=false;
-  }else console.warn("Different local/cloud data; synchronization remains paused");
+   setSyncStatus("✅ 同期済み（クラウドとの一致確認）",true);
+  }else {setSyncStatus("⚠️ 差分あり：同期停止中");console.warn("Different local/cloud data; synchronization remains paused");}
   render();renderAccountStatus(user);return true;
  }catch(e){console.error("クラウド読込エラー",e);return false;}
 }
@@ -1486,12 +1507,13 @@ function applyRemoteSafely(remote){
  if(cloudSyncBlocked||cloudBaseline===null||pendingCloudWrites>0)return false;
  const local=loadWorks();
  const localHash=syncFingerprint(local),remoteHash=syncFingerprint(remote);
- if(localHash===remoteHash){cloudBaseline=remoteHash;remoteRefreshNeeded=false;return true;}
- if(localHash!==cloudBaseline){cloudSyncBlocked=true;console.warn("Local unsynced changes: automatic import blocked");return false;}
- if(state.openId!==null||state.showNew||state.confirm){remoteRefreshNeeded=true;return false;}
+ if(localHash===remoteHash){cloudBaseline=remoteHash;remoteRefreshNeeded=false;setSyncStatus("✅ 同期済み（変更確認済み）",true);return true;}
+ if(localHash!==cloudBaseline){cloudSyncBlocked=true;setSyncStatus("⚠️ 競合あり：同期停止中");console.warn("Local unsynced changes: automatic import blocked");return false;}
+ if(state.openId!==null||state.showNew||state.confirm){remoteRefreshNeeded=true;setSyncStatus("⏸️ 編集画面表示中：取り込み保留");return false;}
  if(!saveWorks(remote)){cloudSyncBlocked=true;return false;}
  state.works=remote;
  cloudBaseline=remoteHash;remoteRefreshNeeded=false;
+ setSyncStatus("✅ 同期済み（自動取り込み確認）",true);
  render();renderAccountStatus(auth.currentUser);
  return true;
 }
@@ -1503,7 +1525,7 @@ function startLiveCloudSync(user){
   const remote=snap.exists()&&Array.isArray(snap.data().works)?snap.data().works:[];
   if(first){first=false;return;}
   applyRemoteSafely(remote);
- },error=>{cloudSyncBlocked=true;console.error("Cloud listener stopped",error)});
+ },error=>{cloudSyncBlocked=true;setSyncStatus("⚠️ 接続エラー：同期停止中");console.error("Cloud listener stopped",error)});
 }
 async function refreshRemoteOnReturn(){
  if(!remoteRefreshNeeded||state.openId!==null||cloudSyncBlocked||!auth.currentUser)return;
@@ -1521,10 +1543,10 @@ async function refreshCloudSync(){
  const snap=await getDoc(doc(db,"users",auth.currentUser.uid));
  const remote=snap.exists()&&Array.isArray(snap.data().works)?snap.data().works:[];
  if(syncFingerprint(local)===syncFingerprint(remote)){
-  cloudBaseline=syncFingerprint(remote);cloudSyncBlocked=false;
+  cloudBaseline=syncFingerprint(remote);cloudSyncBlocked=false;setSyncStatus("✅ 同期済み（再確認完了）",true);
   alert("✓ 端末とクラウドが一致。競合防止付き同期を再開しました。");
  }else{
-  cloudSyncBlocked=true;
+  cloudSyncBlocked=true;setSyncStatus("⚠️ 差分あり：同期停止中");
   alert("端末とクラウドに内容の差分があります。安全のため同期を停止しました。詳細差分を確認してください。自動上書きは行いません。");
  }
 }
