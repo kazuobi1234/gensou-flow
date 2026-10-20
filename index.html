@@ -574,11 +574,9 @@ async function runInstagramImageCheck(){
  const el=document.getElementById("ig-image-check-result");if(!el)return;
  el.textContent="画像URL確認中…";
  try{
-  const user=auth.currentUser;if(!user)throw Error("Googleログインが必要です");
-  const token=await user.getIdToken(true);
+  if(typeof window.requestInstagramImageCheck!=="function")throw Error("画像検査APIが未接続です");
   const url=document.getElementById("ig-image-url").value.trim();
-  const response=await fetch("https://lkynzlittlxhbpvnuajw.supabase.co/functions/v1/instagram-image-check",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({action:"check_image",image_url:url})});
-  const result=await response.json();
+  const result=await window.requestInstagramImageCheck(url);
   el.textContent=result.ready?"✓ JPEG画像URL・応答・容量を確認。Instagramによる取込は未検証。":"確認できません："+(result.reason||result.error||"通信エラー");
  }catch(e){el.textContent="検査失敗："+(e.message||String(e))}
 }
@@ -1281,6 +1279,15 @@ async function requestCompanyAI(productName, employeeKey, request, context) {
   return data.result;
 }
 window.requestCompanyAI = requestCompanyAI;
+async function requestInstagramImageCheck(image_url){
+ const user=auth.currentUser;if(!user)throw Error("Googleログインが必要です");
+ const token=await user.getIdToken(true);
+ const response=await fetch("https://lkynzlittlxhbpvnuajw.supabase.co/functions/v1/instagram-image-check",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({action:"check_image",image_url})});
+ const result=await response.json();
+ if(!response.ok)throw Error(result.error||"画像検査APIでエラーが発生しました");
+ return result;
+}
+window.requestInstagramImageCheck=requestInstagramImageCheck;
 async function requestInstagramMetaDiagnostic(){
  const user=auth.currentUser;if(!user)throw Error("Googleログインが必要です");
  const token=await user.getIdToken(true);
