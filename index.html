@@ -248,6 +248,18 @@ let state = {
   confirm: null // {type:'delete'|'reset', workId}
 };
 
+function saveSyncTestNote(){
+ const w=state.works.find(x=>x.id===state.openId);
+ if(!w||w.name!=="動作確認")return;
+ const input=document.getElementById("sync-test-note"),out=document.getElementById("sync-test-result");
+ if(!input||!out)return;
+ w.syncTestNote=input.value.slice(0,200);
+ const ok=saveWorks(state.works);
+ if(!ok){out.textContent="端末への保存に失敗";return;}
+ out.textContent="端末に保存しました。クラウドへの同期確認中…";
+ enqueueCloudWrite(state.works).then(done=>{out.textContent=done?"✓ 端末・クラウドへ保存しました。":"⚠️ 端末には保存。クラウド同期は停止または失敗しています。";});
+}
+window.saveSyncTestNote=saveSyncTestNote;
 function persist(){
   const ok = saveWorks(state.works);
   enqueueCloudWrite(state.works);
@@ -422,6 +434,7 @@ function renderDetail(){
       ${allDone ? "🎉 全工程完了！" : `次は『${escapeHtml(STEPS[nextIndex].label)}』｜担当：${escapeHtml(STEPS[nextIndex].owner)}`}
     </div>
     <div class="company-label"><strong>AIカンパニー工程</strong> — 社員ごとの担当をつないで進行</div>
+    ${w.name==="動作確認" ? `<section style="margin:16px 20px;padding:16px;border:1px solid #8060a5;border-radius:12px"><h3>🔄 同期テスト専用メモ</h3><p>AI社員への指示や進捗は変更しません。</p><input id="sync-test-note" value="${escapeHtml(w.syncTestNote||"")}" placeholder="例：Fold5から同期確認" style="width:100%;padding:10px"/><button onclick="saveSyncTestNote()" style="margin-top:8px">テストメモを保存</button><p id="sync-test-result" role="status">未保存</p></section>` : ""}
     ${renderOrchestratorPanel(w)}
     ${renderApprovalPanel(w)}
     ${renderInstagramWorkspace(w)}
