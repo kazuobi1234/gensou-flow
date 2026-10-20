@@ -390,7 +390,7 @@ function renderList(){
     </main>
     <div style="margin:16px 20px 90px;display:flex;gap:8px;flex-wrap:wrap;">
       <button onclick="downloadBackup()" style="padding:10px 12px;">バックアップ保存</button>
-      <button onclick="inspectCloudDifference()" style="padding:10px 12px;">🔍 クラウドとの差分を確認（読み取りのみ）</button><button onclick="refreshCloudSync()" style="padding:10px 12px;">🔄 同期状態を再確認</button><button onclick="importCloudWithBackup()" style="padding:10px 12px;">📥 クラウドから取り込む（バックアップ必須）</button>
+      <button onclick="inspectCloudDifference()" style="padding:10px 12px;">🔍 クラウドとの差分を確認（読み取りのみ）</button><button onclick="refreshCloudSync()" style="padding:10px 12px;">🔄 同期状態を再確認</button><button onclick="importCloudWithBackup()" style="padding:10px 12px;">📥 クラウドから取り込む（バックアップ必須）</button><button onclick="resolveSyncConflict()" style="padding:10px 12px;">🛡️ 競合を解決（双方バックアップ・選択）</button>
       <p id="cloud-diff-status" role="status" style="width:100%;font-size:13px;white-space:pre-wrap">同期は安全のため停止中。確認ボタンはデータを変更しません。</p>
       <label style="padding:10px 12px;background:#241a30;border-radius:8px;cursor:pointer;">バックアップ復元<input type="file" accept="application/json" style="display:none" onchange="restoreBackupFile(this.files[0]);this.value=''"></label>
       ${state.works.length===0 ? '<button onclick="restoreKogetsuRecovery()" style="padding:10px 12px;">狐月を履歴から復旧</button>' : ''}
@@ -1559,6 +1559,54 @@ async function importCloudWithBackup(){
  }catch(e){cloudSyncBlocked=true;alert("取り込みを中止しました："+(e.message||String(e)));}
 }
 window.importCloudWithBackup=importCloudWithBackup;
+
+function saveSyncSafetyFile(works, side){
+ const fileName="ai-company-conflict-"+side+"-"+new Date().toISOString().replace(/[:.]/g,"-")+".json";
+ const payload={version:1,exportedAt:new Date().toISOString(),source:side,works};
+ const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+ const url=URL.createObjectURL(blob),link=document.createElement("a");
+ link.href=url;link.download=fileName;document.body.appendChild(link);link.click();link.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),60000);
+ return fileName;
+}
+async function resolveSyncConflict(){
+ const user=auth.currentUser;if(!user)return alert("ログインしてください");
+ cloudSyncBlocked=true;
+ try{
+  await syncQueue.catch(()=>false);
+  const ref=doc(db,"users",user.uid),snap=await getDoc(ref);
+  const remote=snap.exists()&&Array.isArray(snap.data().works)?snap.data().works:[];
+  const local=loadWorks();
+  const remoteHash=syncFingerprint(remote),localHash=syncFingerprint(local);
+  if(localHash===remoteHash){cloudBaseline=remoteHash;cloudSyncBlocked=false;return alert("すでに一致しています。同期を再開しました。");}
+  const localName=saveSyncSafetyFile(local,"device"),cloudName=saveSyncSafetyFile(remote,"cloud");
+  alert("両方のバックアップのダウンロードを開始しました。ダウンロード一覧で2ファイルの保存完了を確認してください。\n"+localName+"\n"+cloudName);
+  if(!confirm("2ファイルとも保存完了を確認しましたか？ 未確認ならキャンセルしてください。"))return;
+  const choice=prompt("どちらを残しますか？\n1：クラウドの内容をこの端末へ取り込む（クラウドは変更しない）\n2：この端末の内容でクラウドを更新する（ほかの端末は別途確認）\nそれ以外：中止","中止");
+  if(choice!=="1"&&choice!=="2")return;
+  if(!confirm(choice==="1"?"クラウドの内容で、この端末のプロジェクト全体を置き換えます。よろしいですか？":"この端末の内容で、クラウドのプロジェクト全体を置き換えます。よろしいですか？"))return;
+  if(choice==="1"){
+   const current=await getDoc(ref),now=current.exists()&&Array.isArray(current.data().works)?current.data().works:[];
+   if(syncFingerprint(now)!==remoteHash)return alert("途中でクラウドが変更されました。中止します。");
+   if(syncFingerprint(loadWorks())!==localHash)return alert("途中で端末データが変更されました。中止します。");
+   if(!saveWorks(remote))return alert("端末保存に失敗しました。取り込みを中止しました。");
+   state.works=remote;state.openId=null;cloudBaseline=remoteHash;cloudSyncBlocked=false;
+   render();renderAccountStatus(user);alert("クラウドから取り込みました。両方のバックアップは保管してください。");
+  }else{
+   if(syncFingerprint(loadWorks())!==localHash)return alert("途中で端末データが変更されました。中止します。");
+   await runTransaction(db,async(tx)=>{
+    const latest=await tx.get(ref);
+    const latestWorks=latest.exists()&&Array.isArray(latest.data().works)?latest.data().works:[];
+    if(syncFingerprint(latestWorks)!==remoteHash)throw Error("クラウドが変更されたため中止");
+    tx.set(ref,{works:local},{merge:true});
+   });
+   cloudBaseline=localHash;cloudSyncBlocked=false;
+   alert("端末のデータをクラウドへ保存しました。ほかの端末の内容は確認してください。");
+  }
+ }catch(e){cloudSyncBlocked=true;alert("競合解決を中止しました："+(e.message||String(e)));}
+}
+window.resolveSyncConflict=resolveSyncConflict;
+
 
 onAuthStateChanged(auth, async (user) => {
   const app = document.getElementById("app");
