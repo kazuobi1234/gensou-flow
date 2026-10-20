@@ -495,6 +495,7 @@ function renderOrchestratorPanel(w){
       <p>くのぎ社長の指示を受け、シラベ → サク → カク → ギョウ → ヨウ → マトメ → チャッピーの順に自動で仕事を引き継ぎます。Etsy・Instagramの公開や販売条件変更は実行せず、最後に社長承認待ちで停止します。</p>
       <label>社長からの指示</label>
       <textarea id="orchestrator-request" placeholder="例：狐月の販売ページとInstagram宣伝を改善して">${escapeHtml(o.request||"")}</textarea>
+      <div style="margin:8px 0 12px"><button type="button" onclick="saveOrchestratorDraft('${w.id}')">💾 指示を保存（実行なし）</button><p id="orchestrator-save-result" role="status" style="font-size:13px">入力後、保存ボタンを押してください。</p></div>
       <div class="relay-status">状態：<strong>${escapeHtml(o.status||"未開始")}</strong>${o.current?`<br>現在：${escapeHtml(o.current)}`:""}</div>
       <div class="relay-actions">
         <button class="relay-start" onclick="startAutoRelay('${w.id}')" ${running?"disabled":""}>🤖 一括で仕事を開始</button>
@@ -502,6 +503,22 @@ function renderOrchestratorPanel(w){
       </div>
     </section>`;
 }
+
+async function saveOrchestratorDraft(workId){
+ const w=state.works.find(x=>x.id===workId),input=document.getElementById("orchestrator-request"),out=document.getElementById("orchestrator-save-result");
+ if(!w||!input||!out)return;
+ if(w.orchestration?.status==="自動進行中"){out.textContent="実行中の指示は変更できません。";return;}
+ const value=input.value;
+ if(!w.orchestration)w.orchestration={request:"",status:"未開始",current:""};
+ w.orchestration.request=value;
+ if(!saveWorks(state.works)){out.textContent="⚠️ 端末への保存に失敗しました。";return;}
+ out.textContent="端末に保存しました。クラウドを確認中…";
+ try{
+  const ok=await enqueueCloudWrite(state.works);
+  out.textContent=ok?"✅ 指示を端末・クラウドに保存しました（AI社員は未実行）":"⚠️ 端末には保存。クラウド同期は未完了・停止中です。";
+ }catch(e){out.textContent="⚠️ 端末には保存。クラウド同期を確認できません。";}
+}
+window.saveOrchestratorDraft=saveOrchestratorDraft;
 
 function relayContext(w,key,masterRequest){
   const names={shirabe:"シラベ",saku:"サク",kaku:"カク",gyou:"ギョウ",you:"ヨウ",matome:"マトメ",chappy:"チャッピー"};
