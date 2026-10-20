@@ -557,7 +557,7 @@ function renderInstagramDiagnostics(w){
     <div class="approval-actions"><button class="approve-btn" onclick="runInstagramMetaDiagnostic()" type="button">🔍 Metaアカウント接続診断（非公開）</button></div>
     <p id="ig-meta-test-result" role="status" style="white-space:pre-wrap;margin-top:12px">未実行。トークンや秘密鍵は表示しません。投稿権限の完全な検証は行いません。</p>
     <div style="margin-top:14px"><label for="ig-image-url">🖼️ 公開画像URL検査（非投稿）</label>
-    <input id="ig-image-url" type="url" placeholder="https://lkynzlittlxhbpvnuajw.supabase.co/storage/v1/object/public/instagram-posts/..." style="width:100%;margin:8px 0"/>
+    <input id="ig-image-url" type="url" placeholder="ここをタップして公開URLを貼り付け（未入力）" style="width:100%;margin:8px 0"/>
     <button type="button" class="revise-btn" onclick="runInstagramImageCheck()">画像URLを検査（公開なし）</button>
     <p id="ig-image-check-result" role="status">未検査</p></div>
     <details style="margin-top:12px">
@@ -575,9 +575,11 @@ async function runInstagramImageCheck(){
  el.textContent="画像URL確認中…";
  try{
   if(typeof window.requestInstagramImageCheck!=="function")throw Error("画像検査APIが未接続です");
-  const url=document.getElementById("ig-image-url").value.trim();
+  const input=document.getElementById("ig-image-url");
+  const url=String(input?.value??"").trim();
+  if(!url){el.textContent="URL未入力です。灰色の表示は入力例（プレースホルダー）です。実際の公開URLを貼り付けてください。";input?.focus();return;}
   const result=await window.requestInstagramImageCheck(url);
-  el.textContent=result.ready?"✓ JPEG画像URL・応答・容量を確認。Instagramによる取込は未検証。":"確認できません："+(result.reason||result.error||"通信エラー");
+  el.textContent=result.ready?"✓ JPEG画像URL・応答・容量を確認。Instagramによる取込は未検証。":"確認できません："+(result.reason||result.error||"通信エラー")+"（入力："+url.length+"文字／API受信："+(result.input_length??"未報告")+"文字）";
  }catch(e){el.textContent="検査失敗："+(e.message||String(e))}
 }
 async function runInstagramMetaDiagnostic(){
