@@ -1369,63 +1369,30 @@ async function requestInstagramImageUpload(file){
 }
 window.requestInstagramImageUpload=requestInstagramImageUpload;
   
+let cloudSyncBlocked = true; // Fail closed until user has safely resolved divergent device data.
 async function saveWorksToCloud(works) {
-  const user = auth.currentUser;
-  if (!user) return false;
-
-  try {
-    await setDoc(doc(db, "users", user.uid), {
-      works: works
-    });
-    return true;
-  } catch (e) {
-    console.error("クラウド保存エラー", e);
-    return false;
-  }
+  // Avoid overwriting another device's latest progress. Manual reconciliation required.
+  if(cloudSyncBlocked) { console.warn("Cloud writes paused to protect cross-device data"); return false; }
+  return false;
 }
-  window.saveWorksToCloud = saveWorksToCloud;
-  async function loadWorksFromCloud() {
-  const user = auth.currentUser;
-  if (!user) return false;
-
-  try {
-    const localWorks = loadWorks();
-    const snap = await getDoc(doc(db, "users", user.uid));
-
-    if (!snap.exists()) {
-      // 初回移行: この端末に既存データがあれば、空のクラウドで上書きせず先にバックアップする。
-      if (localWorks.length > 0) {
-        state.works = localWorks;
-        await saveWorksToCloud(localWorks);
-      }
-      render();
-      renderAccountStatus(user);
-      return true;
-    }
-
-    const data = snap.data();
-    const cloudWorks = Array.isArray(data.works) ? data.works : [];
-
-    if (localWorks.length > 0) {
-      // 復旧保護: この端末に既存プロジェクトがある場合はローカルを正本として保持する。
-      // クラウドが空でも古い内容でも、ログイン直後にローカルを消さず再バックアップする。
-      state.works = localWorks;
-      await saveWorksToCloud(localWorks);
-    } else if (cloudWorks.length > 0) {
-      // 新規端末（ローカル0件）のみクラウドから復元する。
-      state.works = cloudWorks;
-      saveWorks(state.works);
-    } else {
-      state.works = [];
-    }
-
-    render();
-    renderAccountStatus(user);
-    return true;
-  } catch (e) {
-    console.error("クラウド読込エラー", e);
-    return false;
-  }
+window.saveWorksToCloud=saveWorksToCloud;
+async function loadWorksFromCloud() {
+ const user=auth.currentUser;if(!user)return false;
+ try {
+   const localWorks=loadWorks();
+   const snap=await getDoc(doc(db,"users",user.uid));
+   const cloudWorks=snap.exists()&&Array.isArray(snap.data().works)?snap.data().works:[];
+   // Never overwrite local data or Firestore automatically.
+   if(localWorks.length>0){
+     state.works=localWorks;
+     if(cloudWorks.length>0 && JSON.stringify(localWorks)!==JSON.stringify(cloudWorks))
+       alert("⚠️ 端末とクラウドの進捗が異なります。自動同期は安全のため一時停止中です。両端末でバックアップ保存を行い、復旧するまで作業を進めないでください。");
+   } else if(cloudWorks.length>0) {
+     state.works=cloudWorks;
+     saveWorks(state.works);
+   } else state.works=[];
+   render();renderAccountStatus(user);return true;
+ }catch(e){console.error("クラウド読み込みエラー",e);return false;}
 }
 onAuthStateChanged(auth, async (user) => {
   const app = document.getElementById("app");
