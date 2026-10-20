@@ -490,6 +490,7 @@ function getRelayJobs(masterRequest){
 }
 
 const relayCancel = {};
+const relayRunning = {};
 
 // Diagnostics are intentionally restricted to numeric HTTP status and error category.
 function renderOrchestratorPanel(w){
@@ -939,26 +940,32 @@ async function startAutoRelay(workId){
   const input=document.getElementById("orchestrator-request");
   const masterRequest=(input?input.value:"").trim();
   if(!masterRequest){ alert("チャッピーへの一括指示を入力してください。"); return; }
+  if(relayRunning[workId]){alert("この端末ですでに実行中です。重複開始を防止しました。");return;}
   const relayJobs=getRelayJobs(masterRequest);
   const limited=relayJobs.length<AUTO_RELAY.length;
   const relayNames=relayJobs.map(job=>job.name).join(" → ");
   const researchPlanningOnly=relayJobs.some(job=>job.key==="shirabe") && !relayJobs.some(job=>["saku","kaku","gyou","you"].includes(job.key));
+  const resumable=w.orchestration?.request===masterRequest && relayJobs.some(job=>w.ai?.[job.key]?.status==="完了" && !!w.ai[job.key].result);
   const confirmMessage=limited
     ?"依頼範囲に必要な担当だけを実行します。"+relayNames+" の順で進み、範囲外の工程は実行しません。開始しますか？"
     :"AI社員7人を順番に自動実行します。Etsy・Instagramへの公開や販売条件変更は行いません。開始しますか？";
-  if(!confirm(confirmMessage)) return;
+  if(!confirm((resumable?"保存済みの完了工程は保持して途中から再開します。\n":"")+confirmMessage)) return;
 
+  relayRunning[workId]=true;
   relayCancel[workId]=false;
   w.orchestration={request:masterRequest,status:"自動進行中",current:"開始準備"};
-  w.approval={recommendation:"",status:"未決裁",note:""};
-  // A new relay must never inherit stale AI outputs from an earlier run.
-  for(const job of AUTO_RELAY){
-    w.ai[job.key]={request:job.request,result:"",status:relayJobs.some(x=>x.key===job.key)?"未開始":"今回の依頼範囲外"};
+  if(!resumable){
+    w.approval={recommendation:"",status:"未決裁",note:""};
+    // New request: clear stale results. Matching request: keep completed work.
+    for(const job of AUTO_RELAY){
+      w.ai[job.key]={request:job.request,result:"",status:relayJobs.some(x=>x.key===job.key)?"未開始":"今回の依頼範囲外"};
+    }
   }
   persist(); render();
 
   try{
     for(const job of relayJobs){
+      if(resumable && w.ai?.[job.key]?.status==="完了" && w.ai[job.key].result)continue;
       if(relayCancel[workId]){
         w.orchestration.status="停止中";
         w.orchestration.current=job.name+" の前で停止";
@@ -974,7 +981,19 @@ async function startAutoRelay(workId){
       let result="";
       if(job.key==="shirabe"){
         if(typeof window.requestShirabeResearch!=="function") throw new Error("シラベ接続の準備ができていません");
-        result=await window.requestShirabeResearch(w.name, masterRequest+"\n\n"+job.request);
+        for(let attempt=0;attempt<3;attempt++){
+          try{
+            result=await window.requestShirabeResearch(w.name, masterRequest+"\n\n"+job.request);
+            break;
+          }catch(err){
+            const temporary=/Gemini HTTP 503/.test(String(err?.message||err));
+            if(!temporary || attempt===2 || relayCancel[workId])throw err;
+            const delayMs=[1500,4000][attempt];
+            w.orchestration.current=job.name+"：Gemini 503のため再試行 "+(attempt+1)+"/2";
+            persist();render();
+            await new Promise(resolve=>setTimeout(resolve,delayMs));
+          }
+        }
       }else{
         if(typeof window.requestCompanyAI!=="function") throw new Error("AI社員接続の準備ができていません");
         result=await window.requestCompanyAI(w.name,job.key,masterRequest+"\n\n【担当作業】\n"+job.request,relayContext(w,job.key,masterRequest));
@@ -1027,6 +1046,8 @@ async function startAutoRelay(workId){
     w.orchestration.current=error instanceof Error?error.message:"自動進行に失敗しました";
     persist(); render();
     alert(w.orchestration.current);
+  }finally{
+    relayRunning[workId]=false;
   }
 }
 
