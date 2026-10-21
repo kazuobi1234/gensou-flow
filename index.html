@@ -916,7 +916,7 @@ async function publishApprovedInstagramPost(workId){
 
 function inheritCarouselFromEmployees(id){
  const w=state.works.find(x=>x.id===id);if(!w)return;
- if(["approved","publishing","published"].includes(w.instagramCarousel?.status)){alert("承認済み・公開中・公開済み投稿は変更しません。新規下書きを作成してください。");return;}
+ if(["preparing","prepared","approved","publishing","published"].includes(w.instagramCarousel?.status)){alert("承認済み・公開中・公開済み投稿は変更しません。新規下書きを作成してください。");return;}
  const you=(w.ai?.you?.result||"");
  const cap=extractYouInstagramCaption(you).caption?.trim();
  if(!cap){alert("ヨウの成果から投稿文を抽出できません。AI社員の文章を確認してください。");return;}
@@ -930,7 +930,7 @@ function inheritCarouselFromEmployees(id){
 function startEmptyCarouselDraft(id){
  const w=carouselWork(id);if(!w)return;
  const old=w.instagramCarousel||{};
- if(old.status==="publishing"){alert("投稿結果が未確定です。先に状態を照会してください。");return;}
+ if(["preparing","prepared","publishing"].includes(old.status)){alert("投稿結果が未確定です。先に状態を照会してください。");return;}
  if(!confirm("新しい作品用に空の5枚下書きを作成します。以前の申請・公開記録は履歴に保存します。公開は行いません。"))return;
  if(["approved","published"].includes(old.status)&&old.request_key){
   w.instagramCarouselHistory=w.instagramCarouselHistory||[];
@@ -943,7 +943,7 @@ function prepareNewCarouselFromPrevious(id){
  const w=state.works.find(x=>x.id===id);if(!w)return;
  const previous=w.instagramCarousel;
  if(!previous?.image_urls||previous.image_urls.length!==5){alert("再利用可能な5枚がありません");return;}
- if(previous.status==="publishing"){alert("公開結果の確認待ちです。サーバーの状態を照会するまで新規下書きに切り替えられません。");return;}
+ if(["preparing","prepared","publishing"].includes(previous.status)){alert("公開結果の確認待ちです。サーバーの状態を照会するまで新規下書きに切り替えられません。");return;}
  if(!confirm("以前の5枚を再利用して新規投稿用の下書きを作成します。同じ画像を再投稿する可能性があるため、公開前に必ず内容を確認してください。旧申請記録は保持します。"))return;
  w.instagramCarouselHistory=w.instagramCarouselHistory||[];
  if(["approved","published"].includes(previous.status)&&previous.request_key&&!w.instagramCarouselHistory.some(h=>h.request_key===previous.request_key))w.instagramCarouselHistory.push({...previous});
@@ -954,7 +954,7 @@ function prepareNewCarouselFromPrevious(id){
 async function buildInstagramMockups(id){
  const w=carouselWork(id),input=document.getElementById("ig-artwork-four"),status=document.getElementById("ig-artwork-result");
  if(!w||!input||!status)return;
- if(["approved","publishing","published"].includes(w.instagramCarousel?.status)){status.textContent="承認済み・公開済みの投稿は変更できません。新規下書きを作成してください。";return;}
+ if(["preparing","prepared","approved","publishing","published"].includes(w.instagramCarousel?.status)){status.textContent="承認済み・公開済みの投稿は変更できません。新規下書きを作成してください。";return;}
  const files=Array.from(input.files||[]);
  if(files.length!==4||files.some(f=>!["image/png","image/jpeg","image/webp"].includes(f.type)||f.size>10000000)){status.textContent="JPEG・PNG・WebPの元画像4枚（各10MB以下）が必要です";return;}
  if((w.instagramCarousel?.image_urls||[]).length&&!confirm("現在の未承認画像5枚を、新しく制作した5枚に置き換えますか？"))return;
@@ -1003,11 +1003,11 @@ function carouselWork(id){return state.works.find(w=>w.id===id)}
 function updateCarouselStatus(message){const e=document.getElementById("ig-carousel-status");if(e)e.textContent=message}
 function moveInstagramCarouselImage(id,i,delta){
  const w=carouselWork(id),a=w?.instagramCarousel?.image_urls||[],j=i+delta;
- if(j<0||j>=a.length||["approved","publishing","published"].includes(w.instagramCarousel.status))return;
+ if(j<0||j>=a.length||["preparing","prepared","approved","publishing","published"].includes(w.instagramCarousel.status))return;
  [a[i],a[j]]=[a[j],a[i]];w.instagramCarousel={...w.instagramCarousel,image_urls:a,status:"draft",request_key:null};persist();render();
 }
 function resetInstagramCarouselImages(id){
- const w=carouselWork(id);if(!w||["approved","publishing","published"].includes(w.instagramCarousel?.status))return;
+ const w=carouselWork(id);if(!w||["preparing","prepared","approved","publishing","published"].includes(w.instagramCarousel?.status))return;
  if(!confirm("カルーセル下書き画像の選択をクリアしますか？サーバーの旧承認記録は残ります。"))return;
  w.instagramCarousel={image_urls:[],caption:w.instagramCarousel?.caption||"",status:"draft"};persist();render();
 }
@@ -1023,9 +1023,9 @@ async function carouselJpeg(file){
 }
 async function addInstagramCarouselImages(id){
  const w=carouselWork(id),input=document.getElementById("ig-carousel-files");if(!w||!input)return;
- if(["approved","publishing","published"].includes(w.instagramCarousel?.status))return updateCarouselStatus("承認済み投稿の画像は変更できません。新規下書きを作成してください。");
+ if(["preparing","prepared","approved","publishing","published"].includes(w.instagramCarousel?.status))return updateCarouselStatus("承認済み投稿の画像は変更できません。新規下書きを作成してください。");
  const files=Array.from(input.files||[]),old=w.instagramCarousel||{image_urls:[],caption:"",status:"draft"};
- if(["approved","publishing","published"].includes(old.status))return updateCarouselStatus("承認済み・処理中・公開済みの申請は変更できません");
+ if(["preparing","prepared","approved","publishing","published"].includes(old.status))return updateCarouselStatus("承認済み・処理中・公開済みの申請は変更できません");
  if(!files.length||files.length+old.image_urls.length>5)return updateCarouselStatus("合計5枚になるように選択してください");
  const button=input.parentElement.querySelector('button[onclick^="addInstagramCarouselImages"]');button.disabled=true;
  try{
@@ -1043,14 +1043,14 @@ async function addInstagramCarouselImages(id){
 }
 function saveInstagramCarouselDraft(id){
  const w=carouselWork(id);if(!w)return;
- if(["approved","publishing","published"].includes(w.instagramCarousel?.status)){updateCarouselStatus("承認済み・公開処理中・公開済みの投稿は変更できません。新規下書きを作成してください。");return;}
+ if(["preparing","prepared","approved","publishing","published"].includes(w.instagramCarousel?.status)){updateCarouselStatus("承認済み・公開処理中・公開済みの投稿は変更できません。新規下書きを作成してください。");return;}
  const urls=w.instagramCarousel?.image_urls||[],caption=(document.getElementById("ig-carousel-caption")?.value||"").trim();
  if(urls.length!==5||!caption)return updateCarouselStatus("画像5枚と投稿文が必要です");
  w.instagramCarousel={image_urls:urls,caption,status:"draft"};persist();updateCarouselStatus("✓ 5枚の下書きを保存しました（非公開）");
 }
 async function approveInstagramCarouselIntent(id){
  const w=carouselWork(id);if(!w)return;
- if(["approved","publishing","published"].includes(w.instagramCarousel?.status)){updateCarouselStatus("既存の承認済み申請は再申請しません。");return;}
+ if(["preparing","prepared","approved","publishing","published"].includes(w.instagramCarousel?.status)){updateCarouselStatus("既存の承認済み申請は再申請しません。");return;}
  const urls=w.instagramCarousel?.image_urls||[],caption=(document.getElementById("ig-carousel-caption")?.value||"").trim();
  if(urls.length!==5||!caption)return updateCarouselStatus("画像5枚と投稿文が必要です");
  if(!confirm("5枚の順番と投稿文を確認し、サーバーへ承認登録しますか？Instagramには公開しません。"))return;
@@ -1087,7 +1087,7 @@ async function finalizeInstagramCarousel(id){
  if(!w||!e)return;
  const a=w.instagramCarousel;
  const caption=(document.getElementById("ig-carousel-caption")?.value||"").trim();
- if(!a||["published","publishing"].includes(a.status)){e.textContent="公開済みまたは結果確認待ちです。照会ボタンで確認してください。";return;}
+ if(!a||["preparing","prepared","published","publishing"].includes(a.status)){e.textContent="公開済みまたは結果確認待ちです。照会ボタンで確認してください。";return;}
  if((a.image_urls||[]).length!==5||!caption||caption.length>2200){e.textContent="JPEG画像5枚と2200文字以内の投稿文が必要です。";return;}
  if(a.status==="approved"&&caption!==a.caption){e.textContent="承認済み投稿文と内容が異なります。公開しません。";return;}
  if(!confirm("【最終確認1/2】5枚と現在の文章を@kunogistudioへ公開します。承認と投稿を続けて実行しますか？"))return;
@@ -1480,7 +1480,7 @@ function employeeContext(w,key){
 function prepareCarouselFromCompany(id){
  const w=state.works.find(x=>x.id===id),el=document.getElementById("ig-company-prep-status");if(!w||!el)return;
  const old=w.instagramCarousel||{image_urls:[],caption:"",status:"draft"};
- if(["approved","publishing","published"].includes(old.status)){el.textContent="既に承認済み・公開済みです。既存の申請は変更しません。新規下書き作成後に実行してください。";return;}
+ if(["preparing","prepared","approved","publishing","published"].includes(old.status)){el.textContent="既に承認済み・公開済みです。既存の申請は変更しません。新規下書き作成後に実行してください。";return;}
  const proposed=extractYouInstagramCaption(w.ai?.you?.result||"").caption?.trim()||"";
  const caption=old.caption||proposed||w.instagramStandalone?.caption||w.instagramDraft?.caption||"";
  const text=[w.ai?.saku?.result||"",w.ai?.you?.result||""].join("\n");
@@ -1494,7 +1494,7 @@ function prepareCarouselFromCompany(id){
  const status=document.getElementById("ig-company-prep-status");if(status)status.textContent="✓ AI社員の成果から5枚の下書きを準備しました。未承認・未公開です。";
 }
 function syncEmployeeInstagramDraft(w){
- if(!w||["approved","publishing","published"].includes(w.instagramCarousel?.status))return false;
+ if(!w||["preparing","prepared","approved","publishing","published"].includes(w.instagramCarousel?.status))return false;
  const proposal=extractYouInstagramCaption(w.ai?.you?.result||"").caption?.trim()||"";
  const imageText=[w.ai?.saku?.result||"",w.ai?.you?.result||""].join("\n");
  const matches=imageText.match(/https:\/\/lkynzlittlxhbpvnuajw\.supabase\.co\/storage\/v1\/object\/public\/instagram-posts\/[^\s<>"')\]]+\.jpe?g/gi)||[];
