@@ -804,6 +804,8 @@ function renderInstagramWorkspace(w){
     <p id="ig-server-status" role="status">Instagramには公開されません。申請登録 → 内容を確認 → サーバー承認の順で操作します。</p>
     <div style="border:1px solid var(--purple-soft);padding:12px;border-radius:10px;margin:15px 0">
       <h3>🎠 Instagram 5枚カルーセル投稿</h3>
+      <div class="approval-actions"><button type="button" class="revise-btn" onclick="inheritCarouselFromEmployees('${w.id}')">🤖 AI社員の投稿文を下書きへ反映（非公開）</button><button type="button" class="revise-btn" onclick="prepareNewCarouselFromPrevious('${w.id}')">📋 前回の画像5枚で新規下書きを作成（非公開）</button></div>
+      <p style="font-size:12px;opacity:.8">AI社員の文章は内容を確認してから承認。画像の自動生成は行いません。公開済みの記録は変更しません。</p>
       <p>表紙1枚＋スマホモックアップ4枚を順番に登録。旧1枚投稿とは別管理。保存・申請・承認では投稿されません。</p>
       <textarea id="ig-carousel-caption" placeholder="投稿文">${escapeHtml(w.instagramCarousel?.caption||caption)}</textarea>
       <p>登録済み：<span id="ig-carousel-count">${(w.instagramCarousel?.image_urls||[]).length}/5枚</span></p>
@@ -818,7 +820,7 @@ function renderInstagramWorkspace(w){
     <div style="border:1px solid var(--purple-soft);padding:12px;border-radius:10px;margin-top:12px">
       <strong>🔐 Instagram自動公開の準備状況</strong>
       <p style="color:var(--text-dim)">現在は投稿文・画像の準備、公開前チェック、サーバー承認までです。承認済みの単一画像投稿に限り公開APIに接続済みです。実際の投稿成功は未検証です。5枚カルーセルは上の専用欄に実装済みです。</p>
-      <p>投稿先：<strong>@kunogistudio</strong> ／ 公開状態：<strong>未公開</strong></p>
+      <p>投稿先：<strong>@kunogistudio</strong> ／ 5枚カルーセル：<strong>${w.instagramCarousel?.status==="published"?"公開済み（Meta ID: "+escapeHtml(w.instagramCarousel.media_id||"記録なし")+")":"未公開"}</strong></p>
       <p>必要な条件：①本人認証 ②承認済み内容との照合 ③画像URLの検査 ④二重投稿防止 ⑤公開後のMeta ID記録</p>
       <button type="button" class="approve-btn" onclick="publishApprovedInstagramPost('${w.id}')" ${w.name==="狐月｜販売改善"?"disabled":""}>🚀 承認済みの画像1枚をInstagramへ公開（最終確認あり）</button><p id="ig-publish-result" role="status">${w.name==="狐月｜販売改善"?"狐月は5枚カルーセルを完成させる方針のため、旧1枚投稿ボタンを停止しています。":"このボタンを押すと公開確認画面が出ます。確認前は投稿されません。"}</p>
       <p style="color:var(--text-dim)">旧APIは使用せず、承認済み申請と完全一致する内容だけを新しい専用APIへ送信します。公開に失敗した場合は再試行せず状態を確認してください。</p>
@@ -896,6 +898,30 @@ async function publishApprovedInstagramPost(workId){
   if(result.published){w.instagramPublishRequest={...pending,status:"published",media_id:result.media_id||null};persist();out.textContent="✓ Instagram公開応答を受信しました。Meta ID："+(result.media_id||"確認できません");}
   else out.textContent="公開は確認できません。再実行しないでください。";
  }catch(e){out.textContent="公開結果を確認できません："+(e.message||String(e))+"。二重投稿防止のため再実行せず、サーバーの状態を確認してください。";}
+}
+
+function inheritCarouselFromEmployees(id){
+ const w=state.works.find(x=>x.id===id);if(!w)return;
+ if(w.instagramCarousel?.status==="published"){alert("公開済み投稿は変更しません。新規下書きを作成してください。");return;}
+ const you=(w.ai?.you?.result||"");
+ const cap=extractYouInstagramCaption(you).caption?.trim();
+ if(!cap){alert("ヨウの成果から投稿文を抽出できません。AI社員の文章を確認してください。");return;}
+ const el=document.getElementById("ig-carousel-caption");
+ if(!el)return;
+ if(el.value.trim()&&!confirm("現在のカルーセル下書き文章をAI社員の案に置き換えますか？"))return;
+ el.value=cap;
+ w.instagramCarousel={...(w.instagramCarousel||{image_urls:[]}),caption:cap,status:"draft",request_key:null};persist();
+ updateCarouselStatus("AI社員ヨウの文章を下書きへ反映しました。公開・承認はしていません。");
+}
+function prepareNewCarouselFromPrevious(id){
+ const w=state.works.find(x=>x.id===id);if(!w)return;
+ const previous=w.instagramCarousel;
+ if(!previous?.image_urls||previous.image_urls.length!==5){alert("再利用可能な5枚がありません");return;}
+ if(!confirm("以前の5枚を再利用した、新しい未承認の下書きを作りますか？旧公開記録は保持します。"))return;
+ w.instagramCarouselHistory=w.instagramCarouselHistory||[];
+ if(previous.status==="published"&&!w.instagramCarouselHistory.some(h=>h.request_key===previous.request_key))w.instagramCarouselHistory.push({...previous});
+ w.instagramCarousel={image_urls:[...previous.image_urls],caption:previous.caption,status:"draft",request_key:null};
+ persist();render();
 }
 function carouselWork(id){return state.works.find(w=>w.id===id)}
 function updateCarouselStatus(message){const e=document.getElementById("ig-carousel-status");if(e)e.textContent=message}
