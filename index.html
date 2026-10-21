@@ -865,11 +865,11 @@ function renderInstagramWorkspace(w){
       <p id="ig-carousel-status" role="status">カルーセル状態：${escapeHtml(w.instagramCarousel?.status||"未準備")}</p>
       <button class="approve-btn" onclick="publishInstagramCarousel('${w.id}')">🚀 承認済み5枚をInstagramへ公開（2段階確認）</button>
       <button class="approve-btn" onclick="finalizeInstagramCarousel('${w.id}')">✅ 最終確認ひとつで承認→投稿（公開の確認あり）</button><button type="button" class="revise-btn" onclick="checkCarouselServerStatus('${w.id}')">🔎 サーバーの投稿状態を照会（再投稿なし）</button>
-      <p id="ig-carousel-publish-status" role="status">まだ投稿されていません。実公開は最終確認後のみ。</p>
+      <p id="ig-carousel-publish-status" role="status">${w.instagramCarousel?.status==="published"?"✓ Instagram公開済み。Meta ID："+escapeHtml(w.instagramCarousel.media_id||"記録なし"):"未公開。実公開は最終確認後のみ。"}</p>
     </div>
     <div style="border:1px solid var(--purple-soft);padding:12px;border-radius:10px;margin-top:12px">
       <strong>🔐 Instagram自動公開の準備状況</strong>
-      <p style="color:var(--text-dim)">現在は投稿文・画像の準備、公開前チェック、サーバー承認までです。承認済みの単一画像投稿に限り公開APIに接続済みです。実際の投稿成功は未検証です。5枚カルーセルは上の専用欄に実装済みです。</p>
+      <p style="color:var(--text-dim)">5枚カルーセルの公開APIは接続済みで、「狐月」の投稿成功を確認済みです。新しい投稿については、画像・文章の準備とサーバー承認後、最終確認によって公開します。</p>
       <p>投稿先：<strong>@kunogistudio</strong> ／ 5枚カルーセル：<strong>${w.instagramCarousel?.status==="published"?"公開済み（Meta ID: "+escapeHtml(w.instagramCarousel.media_id||"記録なし")+")":"未公開"}</strong></p>
       <p>必要な条件：①本人認証 ②承認済み内容との照合 ③画像URLの検査 ④二重投稿防止 ⑤公開後のMeta ID記録</p>
       <button type="button" class="approve-btn" onclick="publishApprovedInstagramPost('${w.id}')" ${w.name==="狐月｜販売改善"?"disabled":""}>🚀 承認済みの画像1枚をInstagramへ公開（最終確認あり）</button><p id="ig-publish-result" role="status">${w.name==="狐月｜販売改善"?"狐月は5枚カルーセルを完成させる方針のため、旧1枚投稿ボタンを停止しています。":"このボタンを押すと公開確認画面が出ます。確認前は投稿されません。"}</p>
