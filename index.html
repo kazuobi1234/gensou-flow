@@ -828,7 +828,7 @@ function renderInstagramWorkspace(w){
       <div class="approval-actions"><button class="revise-btn" onclick="saveInstagramCarouselDraft('${w.id}')">💾 5枚下書きを保存（非公開）</button><button class="approve-btn" onclick="approveInstagramCarouselIntent('${w.id}')">🔐 5枚をサーバー承認（非公開）</button></div>
       <p id="ig-carousel-status" role="status">カルーセル状態：${escapeHtml(w.instagramCarousel?.status||"未準備")}</p>
       <button class="approve-btn" onclick="publishInstagramCarousel('${w.id}')">🚀 承認済み5枚をInstagramへ公開（2段階確認）</button>
-      <button class="approve-btn" onclick="finalizeInstagramCarousel('${w.id}')">✅ 最終確認ひとつで承認→投稿（公開の確認あり）</button>
+      <button class="approve-btn" onclick="finalizeInstagramCarousel('${w.id}')">✅ 最終確認ひとつで承認→投稿（公開の確認あり）</button><button type="button" class="revise-btn" onclick="checkCarouselServerStatus('${w.id}')">🔎 サーバーの投稿状態を照会（再投稿なし）</button>
       <p id="ig-carousel-publish-status" role="status">まだ投稿されていません。実公開は最終確認後のみ。</p>
     </div>
     <div style="border:1px solid var(--purple-soft);padding:12px;border-radius:10px;margin-top:12px">
@@ -1050,12 +1050,31 @@ async function approveInstagramCarouselIntent(id){
   w.instagramCarousel={image_urls:urls,caption,request_key:key,status:"approved"};persist();updateCarouselStatus("✓ 5枚をサーバー承認済み。Instagram未投稿");
  }catch(e){updateCarouselStatus("承認失敗："+(e.message||String(e))+"。重複申請には注意してください。");}
 }
+async function checkCarouselServerStatus(id){
+ const w=carouselWork(id),el=document.getElementById("ig-carousel-publish-status");
+ if(!w||!el)return;
+ const key=w.instagramCarousel?.request_key;
+ if(!key){el.textContent="サーバーへの申請履歴がありません（未承認）。";return;}
+ try{
+  el.textContent="サーバー状態を照会中…";
+  const result=await window.requestInstagramCarousel({action:"status",project_id:id,request_key:key});
+  if(result.status==="published"){
+   w.instagramCarousel={...w.instagramCarousel,status:"published",media_id:result.media_id||w.instagramCarousel.media_id};persist();
+   el.textContent="✓ 投稿済み Meta ID："+(result.media_id||"記録なし")+"。再投稿しません。";
+  }else if(result.status==="approved"){
+   w.instagramCarousel={...w.instagramCarousel,status:"approved"};persist();el.textContent="サーバー承認済み・未投稿。";
+  }else if(result.status==="publishing"){
+   w.instagramCarousel={...w.instagramCarousel,status:"publishing"};persist();
+   el.textContent="公開処理中または結果の確認待ち。再投稿しないでください。";
+  }else el.textContent="サーバーの状態："+String(result.status||"不明")+"。公開ボタンを再実行せず原因を確認してください。";
+ }catch(err){el.textContent="照会失敗："+(err.message||String(err))+"。公開操作はしていません。";}
+}
 async function finalizeInstagramCarousel(id){
  const w=carouselWork(id),e=document.getElementById("ig-carousel-publish-status");
  if(!w||!e)return;
  const a=w.instagramCarousel;
  const caption=(document.getElementById("ig-carousel-caption")?.value||"").trim();
- if(!a||a.status==="published"){e.textContent="この投稿は公開済みです。再投稿しません。";return;}
+ if(!a||["published","publishing"].includes(a.status)){e.textContent="公開済みまたは結果確認待ちです。照会ボタンで確認してください。";return;}
  if((a.image_urls||[]).length!==5||!caption||caption.length>2200){e.textContent="JPEG画像5枚と2200文字以内の投稿文が必要です。";return;}
  if(a.status==="approved"&&caption!==a.caption){e.textContent="承認済み投稿文と内容が異なります。公開しません。";return;}
  if(!confirm("【最終確認1/2】5枚と現在の文章を@kunogistudioへ公開します。承認と投稿を続けて実行しますか？"))return;
@@ -1075,6 +1094,7 @@ async function finalizeInstagramCarousel(id){
    if(!approval.approved)throw Error("サーバー承認を確認できません");
    w.instagramCarousel={...a,caption,request_key:key,status:"approved"};persist();
   }
+  w.instagramCarousel={...w.instagramCarousel,status:"publishing"};persist();
   e.textContent="Metaへ5枚を投稿中。画面を閉じず再実行しないでください。";
   const result=await window.requestInstagramCarousel({action:"publish",project_id:id,request_key:key,confirmation:phrase});
   if(!result.published)throw Error("投稿成功を確認できません");
