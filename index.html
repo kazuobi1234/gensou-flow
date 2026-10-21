@@ -1050,18 +1050,27 @@ function saveInstagramCarouselDraft(id){
 }
 async function approveInstagramCarouselIntent(id){
  const w=carouselWork(id);if(!w)return;
- if(["preparing","prepared","approved","publishing","published"].includes(w.instagramCarousel?.status)){updateCarouselStatus("既存の承認済み申請は再申請しません。");return;}
- const urls=w.instagramCarousel?.image_urls||[],caption=(document.getElementById("ig-carousel-caption")?.value||"").trim();
- if(urls.length!==5||!caption)return updateCarouselStatus("画像5枚と投稿文が必要です");
+ const current=w.instagramCarousel||{},status=current.status||"draft";
+ if(["approved","publishing","published"].includes(status))return updateCarouselStatus("既に承認済み・公開中・公開済みです。状態を照会してください。");
+ if(status==="preparing")return updateCarouselStatus("申請結果が未確定です。先にサーバー状態を照会してください。");
+ const urls=current.image_urls||[],caption=(document.getElementById("ig-carousel-caption")?.value||"").trim();
+ if(urls.length!==5||!caption||caption.length>2200)return updateCarouselStatus("画像5枚と2200文字以内の投稿文が必要です");
+ if(status==="prepared"&&caption!==current.caption)return updateCarouselStatus("サーバー申請済みの投稿文と一致しません。");
  if(!confirm("5枚の順番と投稿文を確認し、サーバーへ承認登録しますか？Instagramには公開しません。"))return;
- const key=crypto.randomUUID();updateCarouselStatus("申請・承認を登録中…");
+ const key=current.request_key||crypto.randomUUID(),base={request_key:key,project_id:id,caption,image_urls:urls};
+ updateCarouselStatus("申請・承認を登録中…");
  try{
-  const base={request_key:key,project_id:id,caption,image_urls:urls};
-  const prep=await window.requestInstagramCarousel({...base,action:"prepare"});if(!prep.prepared)throw Error("申請登録できません");
+  if(status!=="prepared"){
+   w.instagramCarousel={...current,caption,request_key:key,status:"preparing"};persist();
+   const prep=await window.requestInstagramCarousel({...base,action:"prepare"});
+   if(!prep.prepared)throw Error("申請登録できません");
+   w.instagramCarousel={...w.instagramCarousel,status:"prepared"};persist();
+  }
   const approved=await window.requestInstagramCarousel({...base,action:"approve",confirmation:"このカルーセル投稿の5枚と文章を承認する"});
   if(!approved.approved)throw Error("サーバー承認できません");
-  w.instagramCarousel={image_urls:urls,caption,request_key:key,status:"approved"};persist();updateCarouselStatus("✓ 5枚をサーバー承認済み。Instagram未投稿");
- }catch(e){updateCarouselStatus("承認失敗："+(e.message||String(e))+"。重複申請には注意してください。");}
+  w.instagramCarousel={...w.instagramCarousel,caption,request_key:key,status:"approved"};persist();
+  updateCarouselStatus("✓ 5枚をサーバー承認済み。Instagram未投稿");
+ }catch(e){updateCarouselStatus("承認処理の結果を確認できません："+(e.message||String(e))+"。状態を照会してください。");}
 }
 async function checkCarouselServerStatus(id){
  const w=carouselWork(id),el=document.getElementById("ig-carousel-publish-status");
