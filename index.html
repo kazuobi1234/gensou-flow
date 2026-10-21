@@ -931,9 +931,10 @@ function prepareNewCarouselFromPrevious(id){
  const w=state.works.find(x=>x.id===id);if(!w)return;
  const previous=w.instagramCarousel;
  if(!previous?.image_urls||previous.image_urls.length!==5){alert("再利用可能な5枚がありません");return;}
- if(!confirm("以前の5枚を再利用した、新しい未承認の下書きを作りますか？旧公開記録は保持します。"))return;
+ if(previous.status==="publishing"){alert("公開結果の確認待ちです。サーバーの状態を照会するまで新規下書きに切り替えられません。");return;}
+ if(!confirm("以前の5枚を再利用して新規投稿用の下書きを作成します。同じ画像を再投稿する可能性があるため、公開前に必ず内容を確認してください。旧申請記録は保持します。"))return;
  w.instagramCarouselHistory=w.instagramCarouselHistory||[];
- if(["approved","publishing","published"].includes(previous.status)&&!w.instagramCarouselHistory.some(h=>h.request_key===previous.request_key))w.instagramCarouselHistory.push({...previous});
+ if(["approved","published"].includes(previous.status)&&previous.request_key&&!w.instagramCarouselHistory.some(h=>h.request_key===previous.request_key))w.instagramCarouselHistory.push({...previous});
  w.instagramCarousel={image_urls:[...previous.image_urls],caption:previous.caption,status:"draft",request_key:null};
  persist();render();
 }
