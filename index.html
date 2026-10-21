@@ -782,6 +782,7 @@ function renderInstagramWorkspace(w){
     <input id="ig-image-url" type="hidden" value="${escapeHtml(imageUrl)}">
     <p id="ig-upload-status" role="status">${imageUrl?"画像URLが保存されています（画像自体の有効性は未確認）。":"画像はまだ選択されていません。承認前のアップロードは公開されません。"}</p>
     <div class="approval-actions"><button type="button" class="revise-btn" onclick="checkSavedInstagramImage('${w.id}')">🔎 保存済み画像を自動検査（非公開）</button></div>
+    <div class="approval-actions"><button type="button" class="approve-btn" onclick="convertSavedInstagramImage('${w.id}')">🖼️ 保存済みPNGをJPEG版に変換・別保存（非公開）</button></div>
     <p id="ig-saved-image-check" role="status">以前アップロードした画像も選び直さず検査できます。</p>
     <label>承認後の画像付き投稿下書き</label>
     <textarea id="ig-caption" placeholder="投稿文を入力してください">${escapeHtml(caption)}</textarea>
@@ -886,6 +887,33 @@ async function checkSavedInstagramImage(workId){
  const r=await window.requestInstagramImageCheck(url);
  out.textContent=r.ready?"✓ JPEG公開URL・応答・容量OK。Instagram未投稿です。":"確認が必要："+(r.reason||r.error||"画像URLを確認できません")+"。PNG形式ならJPEG版が必要です。Instagram未投稿です。";
  }catch(e){out.textContent="検査失敗："+(e.message||String(e));}
+}
+async function convertSavedInstagramImage(workId){
+ const w=state.works.find(x=>x.id===workId),out=document.getElementById("ig-saved-image-check"),hidden=document.getElementById("ig-image-url");if(!w||!out||!hidden)return;
+ const url=w.instagramDraft?.image_url||hidden.value;if(!url){out.textContent="元画像が保存されていません";return;}
+ if(!/^https:\/\/lkynzlittlxhbpvnuajw\.supabase\.co\/storage\/v1\/object\/public\/instagram-posts\//.test(url)){out.textContent="安全のため、このプロジェクトの保存済み画像だけ変換できます";return;}
+ const btn=out.parentElement?.querySelector('button[onclick^="convertSavedInstagramImage"]');
+ let bitmap; if(btn)btn.disabled=true;
+ try{
+  out.textContent="保存済み画像を読み込み中…";
+  const response=await fetch(url,{mode:"cors",credentials:"omit"});if(!response.ok)throw Error("画像の読み込みに失敗（HTTP "+response.status+"）");
+  const blob=await response.blob();if(blob.size>10*1024*1024)throw Error("元画像が10MBを超えています");
+  if(!["image/png","image/webp","image/jpeg"].includes(blob.type))throw Error("対応する画像形式ではありません");
+  bitmap=await createImageBitmap(blob);if(bitmap.width*bitmap.height>36000000)throw Error("画像が大きすぎます");
+  const scale=Math.min(1,2048/Math.max(bitmap.width,bitmap.height));
+  const canvas=document.createElement("canvas");canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(bitmap.height*scale);
+  const ctx=canvas.getContext("2d");if(!ctx)throw Error("画像変換に失敗しました");
+  ctx.fillStyle="#ffffff";ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);
+  const jpg=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",0.88));if(!jpg||jpg.size>8*1024*1024)throw Error("JPEG作成に失敗しました");
+  out.textContent="JPEGを別ファイルとして保存中…";
+  const file=new File([jpg],"kogetsu-instagram-"+Date.now()+".jpg",{type:"image/jpeg"});
+  const result=await window.requestInstagramImageUpload(file);
+  if(!result?.image_url)throw Error("JPEG保存先が取得できません");
+  w.instagramDraft={...(w.instagramDraft||{}),image_url:result.image_url,original_image_url:url,published:false};
+  hidden.value=result.image_url;persist();
+  await checkSavedInstagramImage(workId);
+ }catch(e){out.textContent="JPEG変換・検査未完了："+(e.message||String(e))+"。元画像は保持されています。";}
+ finally{bitmap?.close?.();if(btn)btn.disabled=false}
 }
 async function previewInstagramPost(workId){
   const w=state.works.find(x=>x.id===workId);
