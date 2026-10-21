@@ -966,12 +966,14 @@ async function addInstagramCarouselImages(id){
 }
 function saveInstagramCarouselDraft(id){
  const w=carouselWork(id);if(!w)return;
+ if(w.instagramCarousel?.status==="published"){updateCarouselStatus("公開済みの投稿は変更できません。新規下書きを作成してください。");return;}
  const urls=w.instagramCarousel?.image_urls||[],caption=(document.getElementById("ig-carousel-caption")?.value||"").trim();
  if(urls.length!==5||!caption)return updateCarouselStatus("画像5枚と投稿文が必要です");
  w.instagramCarousel={image_urls:urls,caption,status:"draft"};persist();updateCarouselStatus("✓ 5枚の下書きを保存しました（非公開）");
 }
 async function approveInstagramCarouselIntent(id){
  const w=carouselWork(id);if(!w)return;
+ if(w.instagramCarousel?.status==="published"){updateCarouselStatus("公開済みの投稿を再申請しません。");return;}
  const urls=w.instagramCarousel?.image_urls||[],caption=(document.getElementById("ig-carousel-caption")?.value||"").trim();
  if(urls.length!==5||!caption)return updateCarouselStatus("画像5枚と投稿文が必要です");
  if(!confirm("5枚の順番と投稿文を確認し、サーバーへ承認登録しますか？Instagramには公開しません。"))return;
