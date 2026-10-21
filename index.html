@@ -771,7 +771,7 @@ function renderEtsyDraftPanel(w){
  '<textarea id="etsy-draft-description" style="min-height:180px">'+escapeHtml(desc)+'</textarea>'+
  '<div class="approval-actions"><button type="button" class="revise-btn" onclick="saveEtsyPreparation(\''+w.id+'\')">💾 Etsy出品メモを保存（非公開）</button>'+
  '<button type="button" class="revise-btn" onclick="copyEtsyPreparation(\''+w.id+'\')">📋 Etsy用の文面をコピー</button></div>'+
- '<p id="etsy-draft-status" role="status">'+(draft.saved_at?'✓ 出品メモ保存済み。Etsy未反映。':'未保存。外部公開なし。')+'</p>'+
+ '<p id="etsy-draft-status" role="status">'+(draft.saved_at?'✓ 出品メモ保存済み。Etsy未反映。':kaku?'カクの成果を読み込みました。確認して保存してください。':'カクの成果はまだありません。カクに商品タイトル・タグ・説明文を作成させるとここに表示されます。')+'</p>'+
  '</section>';
 }
 function saveEtsyPreparation(id){
@@ -863,8 +863,8 @@ function renderInstagramWorkspace(w){
       <div id="ig-carousel-items" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px;margin:12px 0">${(w.instagramCarousel?.image_urls||[]).map((u,i)=>'<div style="border:1px solid var(--purple-soft);border-radius:12px;padding:9px;min-width:0"><img src="'+escapeHtml(u)+'" alt="投稿画像'+(i+1)+'" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:170px;object-fit:contain;background:#120b20;border-radius:8px" onerror="this.alt=\'画像を読み込めません\'"><div style="font-weight:bold;margin:6px 0">'+(i===0?'表紙':'画像'+(i+1))+'</div><div style="overflow-wrap:anywhere;font-size:11px;opacity:.75">'+escapeHtml(u.split('/').pop())+'</div><div style="display:flex;gap:8px;margin-top:8px"><button type="button" onclick="moveInstagramCarouselImage(\''+w.id+'\','+i+',-1)" '+(i===0?'disabled':'')+'>↑</button><button type="button" onclick="moveInstagramCarouselImage(\''+w.id+'\','+i+',1)" '+(i===4?'disabled':'')+'>↓</button></div></div>').join('')}</div>
       <div class="approval-actions"><button class="revise-btn" onclick="saveInstagramCarouselDraft('${w.id}')">💾 5枚下書きを保存（非公開）</button><button class="approve-btn" onclick="approveInstagramCarouselIntent('${w.id}')">🔐 5枚をサーバー承認（非公開）</button></div>
       <p id="ig-carousel-status" role="status">カルーセル状態：${escapeHtml(w.instagramCarousel?.status||"未準備")}</p>
-      <button class="approve-btn" onclick="publishInstagramCarousel('${w.id}')">🚀 承認済み5枚をInstagramへ公開（2段階確認）</button>
-      <button class="approve-btn" onclick="finalizeInstagramCarousel('${w.id}')">✅ 最終確認ひとつで承認→投稿（公開の確認あり）</button><button type="button" class="revise-btn" onclick="checkCarouselServerStatus('${w.id}')">🔎 サーバーの投稿状態を照会（再投稿なし）</button>
+      <button class="approve-btn" onclick="publishInstagramCarousel('${w.id}')" ${["published","publishing"].includes(w.instagramCarousel?.status)?"disabled":""}>🚀 承認済み5枚をInstagramへ公開（2段階確認）</button>
+      <button class="approve-btn" onclick="finalizeInstagramCarousel('${w.id}')" ${["preparing","prepared","publishing","published"].includes(w.instagramCarousel?.status)?"disabled":""}>✅ 最終確認ひとつで承認→投稿（公開の確認あり）</button><button type="button" class="revise-btn" onclick="checkCarouselServerStatus('${w.id}')">🔎 サーバーの投稿状態を照会（再投稿なし）</button>
       <p id="ig-carousel-publish-status" role="status">${w.instagramCarousel?.status==="published"?"✓ Instagram公開済み。Meta ID："+escapeHtml(w.instagramCarousel.media_id||"記録なし"):"未公開。実公開は最終確認後のみ。"}</p>
     </div>
     <div style="border:1px solid var(--purple-soft);padding:12px;border-radius:10px;margin-top:12px">
