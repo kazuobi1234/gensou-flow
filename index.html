@@ -828,6 +828,7 @@ function renderInstagramWorkspace(w){
       <div class="approval-actions"><button class="revise-btn" onclick="saveInstagramCarouselDraft('${w.id}')">💾 5枚下書きを保存（非公開）</button><button class="approve-btn" onclick="approveInstagramCarouselIntent('${w.id}')">🔐 5枚をサーバー承認（非公開）</button></div>
       <p id="ig-carousel-status" role="status">カルーセル状態：${escapeHtml(w.instagramCarousel?.status||"未準備")}</p>
       <button class="approve-btn" onclick="publishInstagramCarousel('${w.id}')">🚀 承認済み5枚をInstagramへ公開（2段階確認）</button>
+      <button class="approve-btn" onclick="finalizeInstagramCarousel('${w.id}')">✅ 最終確認ひとつで承認→投稿（公開の確認あり）</button>
       <p id="ig-carousel-publish-status" role="status">まだ投稿されていません。実公開は最終確認後のみ。</p>
     </div>
     <div style="border:1px solid var(--purple-soft);padding:12px;border-radius:10px;margin-top:12px">
@@ -1047,6 +1048,39 @@ async function approveInstagramCarouselIntent(id){
   if(!approved.approved)throw Error("サーバー承認できません");
   w.instagramCarousel={image_urls:urls,caption,request_key:key,status:"approved"};persist();updateCarouselStatus("✓ 5枚をサーバー承認済み。Instagram未投稿");
  }catch(e){updateCarouselStatus("承認失敗："+(e.message||String(e))+"。重複申請には注意してください。");}
+}
+async function finalizeInstagramCarousel(id){
+ const w=carouselWork(id),e=document.getElementById("ig-carousel-publish-status");
+ if(!w||!e)return;
+ const a=w.instagramCarousel;
+ const caption=(document.getElementById("ig-carousel-caption")?.value||"").trim();
+ if(!a||a.status==="published"){e.textContent="この投稿は公開済みです。再投稿しません。";return;}
+ if((a.image_urls||[]).length!==5||!caption||caption.length>2200){e.textContent="JPEG画像5枚と2200文字以内の投稿文が必要です。";return;}
+ if(a.status==="approved"&&caption!==a.caption){e.textContent="承認済み投稿文と内容が異なります。公開しません。";return;}
+ if(!confirm("【最終確認1/2】5枚と現在の文章を@kunogistudioへ公開します。承認と投稿を続けて実行しますか？"))return;
+ const phrase=prompt("【最終確認2/2】実際に公開する場合のみ、次の文章を入力してください。\n\nこの承認済みの5枚をInstagramに公開する");
+ if(phrase!=="この承認済みの5枚をInstagramに公開する"){e.textContent="公開をキャンセルしました";return;}
+ const button=Array.from(document.querySelectorAll("button")).find(b=>b.getAttribute("onclick")==="finalizeInstagramCarousel('"+id+"')");
+ if(button)button.disabled=true;
+ try{
+  let key=a.request_key;
+  if(a.status!=="approved"){
+   key=crypto.randomUUID();
+   const base={project_id:id,request_key:key,caption,image_urls:a.image_urls};
+   e.textContent="5枚の申請と承認を登録中…";
+   const prep=await window.requestInstagramCarousel({...base,action:"prepare"});
+   if(!prep.prepared)throw Error("申請登録を確認できません");
+   const approval=await window.requestInstagramCarousel({...base,action:"approve",confirmation:"このカルーセル投稿の5枚と文章を承認する"});
+   if(!approval.approved)throw Error("サーバー承認を確認できません");
+   w.instagramCarousel={...a,caption,request_key:key,status:"approved"};persist();
+  }
+  e.textContent="Metaへ5枚を投稿中。画面を閉じず再実行しないでください。";
+  const result=await window.requestInstagramCarousel({action:"publish",project_id:id,request_key:key,confirmation:phrase});
+  if(!result.published)throw Error("投稿成功を確認できません");
+  w.instagramCarousel={...w.instagramCarousel,status:"published",media_id:result.media_id||null};persist();
+  e.textContent="✓ Instagram公開成功応答："+(result.media_id||"IDなし");
+ }catch(error){e.textContent="処理結果を確認できません："+(error.message||String(error))+"。二重投稿防止のため再実行せず、状態を確認してください。";}
+ finally{if(button)button.disabled=false;}
 }
 async function publishInstagramCarousel(id){
  const w=carouselWork(id),e=document.getElementById("ig-carousel-publish-status");if(!w||!e)return;
