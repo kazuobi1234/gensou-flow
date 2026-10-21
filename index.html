@@ -1036,10 +1036,12 @@ async function addInstagramCarouselImages(id){
    const jpeg=await carouselJpeg(file);
    const result=await window.requestInstagramImageUpload(jpeg);if(!result.image_url)throw Error("URLが保存されませんでした");
    urls.push(result.image_url);
+   // Save each uploaded asset so partial network failure does not lose work.
+   w.instagramCarousel={image_urls:[...urls],caption:document.getElementById("ig-carousel-caption")?.value||"",status:"draft",request_key:null};
+   persist();
   }
-  w.instagramCarousel={image_urls:urls,caption:document.getElementById("ig-carousel-caption")?.value||"",status:"draft"};
-  persist();render();
- }catch(e){updateCarouselStatus("失敗："+(e.message||String(e))+"。既存の画像は保持しました。")}finally{button.disabled=false;}
+  render();
+ }catch(e){updateCarouselStatus("アップロード中断："+(e.message||String(e))+"。成功した画像は下書きに保持しました。再読み込み後、不足分だけ追加してください。");}finally{button.disabled=false;}
 }
 function saveInstagramCarouselDraft(id){
  const w=carouselWork(id);if(!w)return;
