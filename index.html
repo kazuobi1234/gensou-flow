@@ -793,7 +793,14 @@ function renderInstagramWorkspace(w){
       <button class="revise-btn" onclick="approveInstagramServerSide('${w.id}')" ${approved?"":"disabled"}>✅ 投稿内容をサーバー承認（非公開）</button>
     </div>
     <p id="ig-server-status" role="status">Instagramには公開されません。申請登録 → 内容を確認 → サーバー承認の順で操作します。</p>
-    <p style="color:var(--text-dim)">公開操作は実装していません。投稿文だけの保存は決裁前でもできます。</p>
+    <div style="border:1px solid var(--purple-soft);padding:12px;border-radius:10px;margin-top:12px">
+      <strong>🔐 Instagram自動公開の準備状況</strong>
+      <p style="color:var(--text-dim)">現在は投稿文・画像の準備、公開前チェック、サーバー承認までです。実際の公開APIと承認データの安全な連携は未完成です。</p>
+      <p>投稿先：<strong>@kunogistudio</strong> ／ 公開状態：<strong>未公開</strong></p>
+      <p>必要な条件：①本人認証 ②承認済み内容との照合 ③画像URLの検査 ④二重投稿防止 ⑤公開後のMeta ID記録</p>
+      <button type="button" disabled aria-disabled="true" style="opacity:.55;padding:12px;border-radius:8px">🔒 最終承認してInstagramに公開（安全な接続の実装待ち）</button>
+      <p style="color:var(--text-dim)">以前の単体instagram-publish APIは、このボタンから実行しません。公開済みだと誤認しないでください。</p>
+    </div>
   </section>`;
 }
 async function sendInstagramGuard(payload){
