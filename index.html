@@ -804,6 +804,12 @@ function renderInstagramWorkspace(w){
     <p id="ig-server-status" role="status">Instagramには公開されません。申請登録 → 内容を確認 → サーバー承認の順で操作します。</p>
     <div style="border:1px solid var(--purple-soft);padding:12px;border-radius:10px;margin:15px 0">
       <h3>🎠 Instagram 5枚カルーセル投稿</h3>
+      <div style="border:1px solid var(--purple-soft);padding:12px;border-radius:10px;margin:10px 0">
+        <strong>⚡ AI社員 → 5枚投稿 一括準備</strong>
+        <p style="font-size:12px">ヨウの成果から投稿文を取得し、既存の制作画像があれば5枚の下書きを組み立てます。承認済み・公開済みの申請は上書きしません。</p>
+        <button type="button" class="approve-btn" onclick="prepareCarouselFromCompany('${w.id}')">🤖 AI社員の成果を引き継いで投稿準備（非公開）</button>
+        <p id="ig-company-prep-status" role="status">投稿もサーバー承認も行いません。</p>
+      </div>
       <div style="border:1px dashed var(--purple-soft);padding:10px;border-radius:10px">
         <strong>🎨 壁紙4枚から5枚の紹介素材を自動制作（非公開）</strong>
         <p style="font-size:12px">壁紙4枚を順番に選択。画像自体は生成AIで描き直さず、表紙とスマホ使用イメージ4枚を自動組版して保存します。</p>
@@ -1398,6 +1404,22 @@ function employeeContext(w,key){
   const order=["shirabe","saku","gyou","kaku","you","matome"];
   return order.filter(k=>k!==key && w.ai && w.ai[k] && w.ai[k].result)
     .map(k=>k.toUpperCase()+"の成果:\n"+w.ai[k].result).join("\n\n");
+}
+function prepareCarouselFromCompany(id){
+ const w=state.works.find(x=>x.id===id),el=document.getElementById("ig-company-prep-status");if(!w||!el)return;
+ const old=w.instagramCarousel||{image_urls:[],caption:"",status:"draft"};
+ if(old.status==="approved"||old.status==="published"){el.textContent="既に承認済み・公開済みです。既存の申請は変更しません。新規下書き作成後に実行してください。";return;}
+ const proposed=extractYouInstagramCaption(w.ai?.you?.result||"").caption?.trim()||"";
+ const caption=old.caption||proposed||w.instagramStandalone?.caption||w.instagramDraft?.caption||"";
+ const text=[w.ai?.saku?.result||"",w.ai?.you?.result||""].join("\n");
+ const regex=/https:\/\/lkynzlittlxhbpvnuajw\.supabase\.co\/storage\/v1\/object\/public\/instagram-posts\/[^\s<>"')\]]+\.jpe?g/gi;
+ const candidates=[...new Set(text.match(regex)||[])];
+ const oldUrls=(old.image_urls||[]);
+ const urls=oldUrls.length===5?oldUrls:candidates.length===5?candidates:[];
+ if(!caption||urls.length!==5){el.textContent="自動準備に必要な素材が不足：投稿文"+(caption?"OK":"なし")+"／画像"+urls.length+"/5。画像4枚の自動制作欄かAI社員の成果を使って補ってください。";return;}
+ w.instagramCarousel={image_urls:[...urls],caption,status:"draft",request_key:null,source:"company-assisted"};
+ persist();render();
+ const status=document.getElementById("ig-company-prep-status");if(status)status.textContent="✓ AI社員の成果から5枚の下書きを準備しました。未承認・未公開です。";
 }
 function syncEmployeeInstagramDraft(w){
  if(!w||w.instagramCarousel?.status==="published"||w.instagramCarousel?.status==="approved")return false;
