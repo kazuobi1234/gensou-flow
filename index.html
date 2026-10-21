@@ -813,7 +813,7 @@ function renderInstagramWorkspace(w){
       <div style="border:1px dashed var(--purple-soft);padding:10px;border-radius:10px">
         <strong>🎨 AI新規イラスト制作（非公開）</strong>
         <p style="font-size:12px">Cloudflare無料枠の画像AIに接続できれば、作品指示から4枚を制作・保存し、そのまま下の5枚紹介素材へ引き継げます。接続未設定時は実行しません。</p>
-        <textarea id="ig-generate-prompt" placeholder="例：A mysterious Japanese shrine in moonlight, vermilion torii gate, purple fog, cinematic illustration..." style="min-height:95px"></textarea>
+        <textarea id="ig-generate-prompt" placeholder="サクの制作案を自動使用します。必要ならここに絵柄の指示を入力できます。" style="min-height:95px"></textarea>
         <button type="button" class="revise-btn" onclick="generateArtworkFour('${w.id}')">✨ AIで原画4枚を生成して登録（非公開）</button>
         <p id="ig-generate-status" role="status">画像生成接続：未確認</p>
         <strong>🎨 壁紙4枚から5枚の紹介素材を自動制作（非公開）</strong>
@@ -965,7 +965,10 @@ async function generateArtworkFour(id){
  const w=carouselWork(id),el=document.getElementById("ig-generate-status");
  if(!w||!el)return;
  if(["preparing","prepared","approved","publishing","published"].includes(w.instagramCarousel?.status)){el.textContent="承認中・公開済み投稿は変更しません。空の新規下書きを開始してください。";return;}
- const promptText=(document.getElementById("ig-generate-prompt")?.value||"").trim();
+ const proposal=String(w.ai?.saku?.result||"").trim();
+ const field=document.getElementById("ig-generate-prompt");
+ const promptText=(field?.value||proposal).trim().slice(0,1200);
+ if(field&&!field.value.trim()&&promptText)field.value=promptText;
  if(promptText.length<20||promptText.length>1200){el.textContent="画像の制作指示を20〜1200文字で入力してください。";return;}
  const button=Array.from(document.querySelectorAll("button")).find(b=>b.getAttribute("onclick")==="generateArtworkFour('"+id+"')");
  if(button)button.disabled=true;
