@@ -1006,8 +1006,9 @@ async function generateArtworkFour(id){
  if(["preparing","prepared","approved","publishing","published"].includes(w.instagramCarousel?.status)){el.textContent="承認中・公開済み投稿は変更しません。空の新規下書きを開始してください。";return;}
  const proposal=String(w.ai?.saku?.result||"").trim();
  const field=document.getElementById("ig-generate-prompt");
- const promptText=(field?.value||proposal).trim().slice(0,1200);
- if(field&&!field.value.trim()&&promptText)field.value=promptText;
+ const meaningful=proposal.split(/\r?\n/).map(x=>x.trim()).filter(x=>x&&!/^\||^[-|: ]+$/.test(x)&&!/^くのぎ社長|^お疲れ様|^現在の確認|^API|^Instagram投稿文|^---/.test(x)).filter(x=>/鳥居|神社|狐|月|霧|彼岸花|衣装|風景|デザイン|背景|構図|shrine|torii|moon|fox/i.test(x)).slice(0,9).join("。");
+ const promptText=(field?.value?.trim()||("Original Japanese fantasy illustration for a vertical phone wallpaper, detailed atmospheric composition, no typography. "+(meaningful||w.name))).slice(0,1200);
+ if(field&&!field.value.trim())field.value=promptText;
  if(promptText.length<20||promptText.length>1200){el.textContent="画像の制作指示を20〜1200文字で入力してください。";return;}
  const button=Array.from(document.querySelectorAll("button")).find(b=>b.getAttribute("onclick")==="generateArtworkFour('"+id+"')");
  if(button)button.disabled=true;
