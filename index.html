@@ -804,11 +804,11 @@ function renderInstagramWorkspace(w){
     <p id="ig-server-status" role="status">Instagramには公開されません。申請登録 → 内容を確認 → サーバー承認の順で操作します。</p>
     <div style="border:1px solid var(--purple-soft);padding:12px;border-radius:10px;margin-top:12px">
       <strong>🔐 Instagram自動公開の準備状況</strong>
-      <p style="color:var(--text-dim)">現在は投稿文・画像の準備、公開前チェック、サーバー承認までです。実際の公開APIと承認データの安全な連携は未完成です。</p>
+      <p style="color:var(--text-dim)">現在は投稿文・画像の準備、公開前チェック、サーバー承認までです。承認済みの単一画像投稿に限り公開APIに接続済みです。実際の投稿成功は未検証です。5枚カルーセルには対応していません。</p>
       <p>投稿先：<strong>@kunogistudio</strong> ／ 公開状態：<strong>未公開</strong></p>
       <p>必要な条件：①本人認証 ②承認済み内容との照合 ③画像URLの検査 ④二重投稿防止 ⑤公開後のMeta ID記録</p>
-      <button type="button" disabled aria-disabled="true" style="opacity:.55;padding:12px;border-radius:8px">🔒 最終承認してInstagramに公開（安全な接続の実装待ち）</button>
-      <p style="color:var(--text-dim)">以前の単体instagram-publish APIは、このボタンから実行しません。公開済みだと誤認しないでください。</p>
+      <button type="button" class="approve-btn" onclick="publishApprovedInstagramPost('${w.id}')">🚀 承認済みの画像1枚をInstagramへ公開（最終確認あり）</button><p id="ig-publish-result" role="status">このボタンを押すと公開確認画面が出ます。確認前は投稿されません。</p>
+      <p style="color:var(--text-dim)">旧APIは使用せず、承認済み申請と完全一致する内容だけを新しい専用APIへ送信します。公開に失敗した場合は再試行せず状態を確認してください。</p>
     </div>
   </section>`;
 }
@@ -867,6 +867,22 @@ async function approveInstagramServerSide(workId){
     persist();
     output.textContent="サーバー承認記録済み。Instagramへの投稿は行っていません。";
   }catch(e){output.textContent="承認失敗："+(e.message||String(e));}
+}
+async function publishApprovedInstagramPost(workId){
+ const w=state.works.find(x=>x.id===workId),out=document.getElementById("ig-publish-result");if(!w||!out)return;
+ const pending=w.instagramPublishRequest;
+ if(!pending||pending.status!=="approved"||!editorialMatches(w)){out.textContent="現在の投稿文・画像とサーバー承認が一致しません。公開できません。";return;}
+ if(w.name!=="狐月｜販売改善"){out.textContent="この公開画面は狐月｜販売改善の申請だけを対象とします。";return;}
+ if(!pending.image_url.toLowerCase().includes(".jpg")){out.textContent="JPEG画像を選択してください。";return;}
+ if(!confirm("【最終確認 1/2】@kunogistudio に画像1枚を実際に公開します。5枚カルーセルではありません。続けますか？"))return;
+ const phrase=prompt("【最終確認 2/2】公開を実行する場合だけ、次の文字を正確に入力してください。\n\nこの承認済み投稿をInstagramに公開する");
+ if(phrase!=="この承認済み投稿をInstagramに公開する"){out.textContent="公開をキャンセルしました。";return;}
+ out.textContent="Instagramへ公開処理中。押し直さないでください。";
+ try{
+  const result=await window.requestInstagramApprovedPublish({action:"publish",request_key:pending.request_key,project_id:workId,confirmation:phrase});
+  if(result.published){w.instagramPublishRequest={...pending,status:"published",media_id:result.media_id||null};persist();out.textContent="✓ Instagram公開応答を受信しました。Meta ID："+(result.media_id||"確認できません");}
+  else out.textContent="公開は確認できません。再実行しないでください。";
+ }catch(e){out.textContent="公開結果を確認できません："+(e.message||String(e))+"。二重投稿防止のため再実行せず、サーバーの状態を確認してください。";}
 }
 function saveStandaloneInstagramDraft(workId){
   const w=state.works.find(x=>x.id===workId);
@@ -1505,6 +1521,14 @@ async function requestInstagramGuard(payload){
  return data;
 }
 window.requestInstagramGuard=requestInstagramGuard;
+async function requestInstagramApprovedPublish(payload){
+ const user=auth.currentUser;if(!user)throw Error("Googleログインが必要です");
+ const token=await user.getIdToken(true);
+ const response=await fetch("https://lkynzlittlxhbpvnuajw.supabase.co/functions/v1/instagram-publish-approved",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify(payload)});
+ const data=await response.json().catch(()=>({}));if(!response.ok)throw Error(data.error||"公開結果を確認できません");return data;
+}
+window.requestInstagramApprovedPublish=requestInstagramApprovedPublish;
+
 async function requestInstagramPreview(image_url,caption){
   const user=auth.currentUser;
   if(!user)throw new Error("Googleでログインしてください。");
