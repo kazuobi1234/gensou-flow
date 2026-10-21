@@ -1076,9 +1076,13 @@ async function checkCarouselServerStatus(id){
    el.textContent="✓ 投稿済み Meta ID："+(result.media_id||"記録なし")+"。再投稿しません。";
   }else if(result.status==="approved"){
    w.instagramCarousel={...w.instagramCarousel,status:"approved"};persist();el.textContent="サーバー承認済み・未投稿。";
+  }else if(result.status==="prepared"){
+   w.instagramCarousel={...w.instagramCarousel,status:"prepared"};persist();el.textContent="サーバー申請済み・未承認。確認が必要です。公開はしません。";
   }else if(result.status==="publishing"){
    w.instagramCarousel={...w.instagramCarousel,status:"publishing"};persist();
    el.textContent="公開処理中または結果の確認待ち。再投稿しないでください。";
+  }else if(result.status==="not_found"){
+   el.textContent="サーバーに申請が見つかりません。投稿は実行していません。申請情報を再確認してください。";
   }else el.textContent="サーバーの状態："+String(result.status||"不明")+"。公開ボタンを再実行せず原因を確認してください。";
  }catch(err){el.textContent="照会失敗："+(err.message||String(err))+"。公開操作はしていません。";}
 }
