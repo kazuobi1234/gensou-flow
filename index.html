@@ -958,6 +958,7 @@ async function buildInstagramMockups(id){
  const files=Array.from(input.files||[]);
  if(files.length!==4||files.some(f=>!["image/png","image/jpeg","image/webp"].includes(f.type)||f.size>10000000)){status.textContent="JPEG・PNG・WebPの元画像4枚（各10MB以下）が必要です";return;}
  if((w.instagramCarousel?.image_urls||[]).length&&!confirm("現在の未承認画像5枚を、新しく制作した5枚に置き換えますか？"))return;
+ if(typeof window.requestInstagramImageUpload!=="function"){status.textContent="アップロード接続が未準備です。ログインを確認してください。";return;}
  const btn=input.nextElementSibling;btn.disabled=true;
  let bitmaps=[];
  try{
@@ -994,7 +995,9 @@ async function buildInstagramMockups(id){
    const result=await window.requestInstagramImageUpload(file);
    if(!result?.image_url)throw Error("保存先URLがありません");
    uploaded.push(result.image_url);
+   w.instagramMockupProgress={image_urls:[...uploaded],created_at:new Date().toISOString()};persist();
   }
+  delete w.instagramMockupProgress;
   const caption=(document.getElementById("ig-carousel-caption")?.value||"").trim();
   w.instagramCarousel={image_urls:uploaded,caption,status:"draft",request_key:null,source:"auto-mockups"};persist();render();
  }catch(err){status.textContent="制作を中断しました："+(err.message||String(err))+"。元画像はそのままです。途中保存分は投稿されません。";}finally{bitmaps.forEach(b=>b.close?.());btn.disabled=false;}
@@ -1027,6 +1030,7 @@ async function addInstagramCarouselImages(id){
  const files=Array.from(input.files||[]),old=w.instagramCarousel||{image_urls:[],caption:"",status:"draft"};
  if(["preparing","prepared","approved","publishing","published"].includes(old.status))return updateCarouselStatus("承認済み・処理中・公開済みの申請は変更できません");
  if(!files.length||files.length+old.image_urls.length>5)return updateCarouselStatus("合計5枚になるように選択してください");
+ if(typeof window.requestInstagramImageUpload!=="function")return updateCarouselStatus("アップロード接続が未準備です。ログインを確認してください。");
  const button=input.parentElement.querySelector('button[onclick^="addInstagramCarouselImages"]');button.disabled=true;
  try{
   const urls=[...old.image_urls];
@@ -1048,7 +1052,7 @@ function saveInstagramCarouselDraft(id){
  if(["preparing","prepared","approved","publishing","published"].includes(w.instagramCarousel?.status)){updateCarouselStatus("承認済み・公開処理中・公開済みの投稿は変更できません。新規下書きを作成してください。");return;}
  const urls=w.instagramCarousel?.image_urls||[],caption=(document.getElementById("ig-carousel-caption")?.value||"").trim();
  if(urls.length!==5||!caption)return updateCarouselStatus("画像5枚と投稿文が必要です");
- w.instagramCarousel={image_urls:urls,caption,status:"draft"};persist();updateCarouselStatus("✓ 5枚の下書きを保存しました（非公開）");
+ w.instagramCarousel={image_urls:[...urls],caption,status:"draft",request_key:null};persist();updateCarouselStatus("✓ 5枚の下書きを保存しました（非公開）");
 }
 async function approveInstagramCarouselIntent(id){
  const w=carouselWork(id);if(!w)return;
