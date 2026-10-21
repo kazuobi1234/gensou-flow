@@ -817,7 +817,7 @@ function renderInstagramWorkspace(w){
         <button type="button" class="revise-btn" onclick="buildInstagramMockups('${w.id}')">🪄 5枚を制作して下書きに登録（非公開）</button>
         <p id="ig-artwork-result" role="status">元の壁紙は変更しません。</p>
       </div>
-      <div class="approval-actions"><button type="button" class="revise-btn" onclick="inheritCarouselFromEmployees('${w.id}')">🤖 AI社員の投稿文を下書きへ反映（非公開）</button><button type="button" class="revise-btn" onclick="prepareNewCarouselFromPrevious('${w.id}')">📋 前回の画像5枚で新規下書きを作成（非公開）</button></div>
+      <div class="approval-actions"><button type="button" class="revise-btn" onclick="inheritCarouselFromEmployees('${w.id}')">🤖 AI社員の投稿文を下書きへ反映（非公開）</button><button type="button" class="revise-btn" onclick="prepareNewCarouselFromPrevious('${w.id}')">📋 前回の画像5枚で新規下書きを作成（非公開）</button><button type="button" class="revise-btn" onclick="startEmptyCarouselDraft('${w.id}')">🆕 別作品の空の下書きを開始（非公開）</button></div>
       <p style="font-size:12px;opacity:.8">ヨウの投稿文は成果保存時に下書きへ自動反映。サクの成果に専用StorageのJPEG公開URLがちょうど5件あれば自動で画像も登録。実画像の生成・書き込みは別工程です。承認済み・公開済みの内容は変更しません。</p>
       <p>表紙1枚＋スマホモックアップ4枚を順番に登録。旧1枚投稿とは別管理。保存・申請・承認では投稿されません。</p>
       <textarea id="ig-carousel-caption" placeholder="投稿文">${escapeHtml(w.instagramCarousel?.caption||caption)}</textarea>
@@ -926,6 +926,18 @@ function inheritCarouselFromEmployees(id){
  el.value=cap;
  w.instagramCarousel={...(w.instagramCarousel||{image_urls:[]}),caption:cap,status:"draft",request_key:null};persist();
  updateCarouselStatus("AI社員ヨウの文章を下書きへ反映しました。公開・承認はしていません。");
+}
+function startEmptyCarouselDraft(id){
+ const w=carouselWork(id);if(!w)return;
+ const old=w.instagramCarousel||{};
+ if(old.status==="publishing"){alert("投稿結果が未確定です。先に状態を照会してください。");return;}
+ if(!confirm("新しい作品用に空の5枚下書きを作成します。以前の申請・公開記録は履歴に保存します。公開は行いません。"))return;
+ if(["approved","published"].includes(old.status)&&old.request_key){
+  w.instagramCarouselHistory=w.instagramCarouselHistory||[];
+  if(!w.instagramCarouselHistory.some(h=>h.request_key===old.request_key))w.instagramCarouselHistory.push({...old});
+ }
+ w.instagramCarousel={image_urls:[],caption:"",status:"draft",request_key:null,source:"new-artwork"};
+ persist();render();
 }
 function prepareNewCarouselFromPrevious(id){
  const w=state.works.find(x=>x.id===id);if(!w)return;
