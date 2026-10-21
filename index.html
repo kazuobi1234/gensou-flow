@@ -805,7 +805,7 @@ function renderInstagramWorkspace(w){
     <div style="border:1px solid var(--purple-soft);padding:12px;border-radius:10px;margin:15px 0">
       <h3>🎠 Instagram 5枚カルーセル投稿</h3>
       <div class="approval-actions"><button type="button" class="revise-btn" onclick="inheritCarouselFromEmployees('${w.id}')">🤖 AI社員の投稿文を下書きへ反映（非公開）</button><button type="button" class="revise-btn" onclick="prepareNewCarouselFromPrevious('${w.id}')">📋 前回の画像5枚で新規下書きを作成（非公開）</button></div>
-      <p style="font-size:12px;opacity:.8">AI社員の文章は内容を確認してから承認。画像の自動生成は行いません。公開済みの記録は変更しません。</p>
+      <p style="font-size:12px;opacity:.8">ヨウの投稿文は成果保存時に下書きへ自動反映。サクの成果に専用StorageのJPEG公開URLがちょうど5件あれば自動で画像も登録。実画像の生成・書き込みは別工程です。承認済み・公開済みの内容は変更しません。</p>
       <p>表紙1枚＋スマホモックアップ4枚を順番に登録。旧1枚投稿とは別管理。保存・申請・承認では投稿されません。</p>
       <textarea id="ig-carousel-caption" placeholder="投稿文">${escapeHtml(w.instagramCarousel?.caption||caption)}</textarea>
       <p>登録済み：<span id="ig-carousel-count">${(w.instagramCarousel?.image_urls||[]).length}/5枚</span></p>
@@ -1343,11 +1343,27 @@ function employeeContext(w,key){
   return order.filter(k=>k!==key && w.ai && w.ai[k] && w.ai[k].result)
     .map(k=>k.toUpperCase()+"の成果:\n"+w.ai[k].result).join("\n\n");
 }
+function syncEmployeeInstagramDraft(w){
+ if(!w||w.instagramCarousel?.status==="published"||w.instagramCarousel?.status==="approved")return false;
+ const proposal=extractYouInstagramCaption(w.ai?.you?.result||"").caption?.trim()||"";
+ const imageText=[w.ai?.saku?.result||"",w.ai?.you?.result||""].join("\n");
+ const matches=imageText.match(/https:\/\/lkynzlittlxhbpvnuajw\.supabase\.co\/storage\/v1\/object\/public\/instagram-posts\/[^\s<>"')\]]+\.jpe?g/gi)||[];
+ const unique=[...new Set(matches)];
+ const old=w.instagramCarousel||{image_urls:[],caption:"",status:"draft"};
+ // Never erase manually selected assets or copy; never convert unverified AI text into publication.
+ const images=old.image_urls?.length?old.image_urls:(unique.length===5?unique:[]);
+ const caption=old.caption||proposal;
+ if(!caption&&!images.length)return false;
+ if(old.caption===caption&&JSON.stringify(old.image_urls||[])===JSON.stringify(images))return false;
+ w.instagramCarousel={...old,caption,image_urls:images,status:"draft",request_key:null,source:"ai-assisted"};
+ return true;
+}
 function saveEmployee(workId,key){
   const w=state.works.find(x=>x.id===workId); if(!w) return;
   const request=document.getElementById(key+"-request").value.trim();
   const result=document.getElementById(key+"-result").value.trim();
   w.ai[key]={request,result,status:result?"成果あり":"依頼準備済み"};
+  if(key==="you"||key==="saku")syncEmployeeInstagramDraft(w);
   persist(); render();
 }
 async function runEmployee(workId,key,name){
@@ -1363,6 +1379,7 @@ async function runEmployee(workId,key,name){
     const context=employeeContext(w,key);
     const result=await window.requestCompanyAI(w.name,key,request,context);
     w.ai[key]={request,result,status:"成果あり"};
+    if(key==="you"||key==="saku")syncEmployeeInstagramDraft(w);
     persist(); render();
   }catch(error){
     console.error(name+"実行エラー",error);
@@ -1377,6 +1394,7 @@ function completeEmployee(workId,key){
   const result=document.getElementById(key+"-result").value.trim();
   if(!result){ alert("成果を作成してから完了してください。"); return; }
   w.ai[key]={request,result,status:"完了"};
+  if(key==="you"||key==="saku")syncEmployeeInstagramDraft(w);
   (EMPLOYEE_STEP_MAP[key]||[]).forEach(i=>w.steps[i]=true);
   persist(); render();
 }
