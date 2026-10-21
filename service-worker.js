@@ -1,8 +1,6 @@
-const CACHE_NAME = "ai-company-v25";
+const CACHE_NAME = "ai-company-v26";
 
 const ASSETS = [
-  "./",
-  "./index.html",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png"
@@ -48,8 +46,6 @@ self.addEventListener("fetch", (event) => {
 
   // アイコン等はキャッシュを利用
   event.respondWith(
-    caches.match(event.request).then((cached) =>
-      cached || fetch(event.request)
-    )
+    fetch(event.request).catch(() => caches.match(event.request))
   );
 });
