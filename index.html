@@ -814,7 +814,7 @@ function renderInstagramWorkspace(w){
         <strong>🎨 AI新規イラスト制作（非公開）</strong>
         <p style="font-size:12px">Cloudflare無料枠の画像AIに接続できれば、作品指示から4枚を制作・保存し、そのまま下の5枚紹介素材へ引き継げます。接続未設定時は実行しません。</p>
         <textarea id="ig-generate-prompt" placeholder="サクの制作案を自動使用します。必要ならここに絵柄の指示を入力できます。" style="min-height:95px"></textarea>
-        <button type="button" class="revise-btn" onclick="generateArtworkFour('${w.id}')">✨ AIで原画4枚を生成して登録（非公開）</button>
+        <button type="button" class="revise-btn" onclick="checkArtworkProvider()">🔎 無料画像AIの接続を確認</button><button type="button" class="revise-btn" onclick="generateArtworkFour('${w.id}')">✨ AIで原画4枚を生成して登録（非公開）</button>
         <p id="ig-generate-status" role="status">画像生成接続：未確認</p>
         <strong>🎨 壁紙4枚から5枚の紹介素材を自動制作（非公開）</strong>
         <p style="font-size:12px">壁紙4枚を順番に選択。画像自体は生成AIで描き直さず、表紙とスマホ使用イメージ4枚を自動組版して保存します。</p>
@@ -957,6 +957,14 @@ function prepareNewCarouselFromPrevious(id){
  persist();render();
 }
 
+async function checkArtworkProvider(){
+ const el=document.getElementById("ig-generate-status");if(!el)return;
+ el.textContent="画像生成接続を確認中…";
+ try{
+  const response=await requestNewArtwork({action:"status"});
+  el.textContent=response.configured?"✓ Cloudflare画像AIの認証情報が設定されています。実際の画像生成は未確認です。":"Cloudflare画像AIは未設定です。Account IDとWorkers AI API TokenをSupabaseサーバー側に設定する必要があります。";
+ }catch(error){el.textContent="接続確認に失敗："+(error.message||String(error));}
+}
 async function requestNewArtwork(payload){
  if(typeof window.requestArtworkGenerate!=="function")throw Error("画像生成の認証接続が準備できていません");
  return window.requestArtworkGenerate(payload);
