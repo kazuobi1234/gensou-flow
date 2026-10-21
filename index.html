@@ -969,10 +969,10 @@ async function buildInstagramMockups(id){
   const title=String(w.name||"Kunogi Studio").replace(/[\r\n\t]/g," ").trim().slice(0,28);
   const makeCanvas=(width,height)=>{const c=document.createElement("canvas");c.width=width;c.height=height;return [c,c.getContext("2d")];};
   const cover=makeCanvas(1080,1350),cc=cover[1];cc.fillStyle="#130c23";cc.fillRect(0,0,1080,1350);
-  cc.fillStyle="#f5ddc3";cc.textAlign="center";cc.font="bold 66px serif";cc.fillText(title,540,110);cc.font="30px serif";cc.fillText("KUNOGI STUDIO  |  DIGITAL WALLPAPERS",540,162);
+  cc.fillStyle="#f5ddc3";cc.textAlign="center";cc.font="bold 66px serif";cc.fillText(title,540,110,990);cc.font="30px serif";cc.fillText("KUNOGI STUDIO  |  DIGITAL WALLPAPERS",540,162);
   const drawFit=(c,b,x,y,ww,hh)=>{const scale=Math.min(ww/b.width,hh/b.height);const dw=b.width*scale,dh=b.height*scale;c.drawImage(b,x+(ww-dw)/2,y+(hh-dh)/2,dw,dh);};
   for(let i=0;i<4;i++){const x=35+i*260,y=245;cc.fillStyle="#30223d";cc.fillRect(x,y,245,930);drawFit(cc,bitmaps[i],x,y,245,930);cc.font="22px sans-serif";cc.fillStyle="#e9d4c5";cc.fillText("0"+(i+1),x+122,1210);}
-  cc.font="27px sans-serif";cc.fillText("4 JAPANESE FANTASY PHONE WALLPAPERS",540,1280);
+  cc.font="27px sans-serif";cc.fillText("4 ORIGINAL PHONE WALLPAPERS",540,1280);
   const canvases=[cover[0]];
   for(let i=0;i<4;i++){
    const [c,g]=makeCanvas(1080,1350);
