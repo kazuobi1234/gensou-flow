@@ -811,6 +811,11 @@ function renderInstagramWorkspace(w){
         <p id="ig-company-prep-status" role="status">投稿もサーバー承認も行いません。</p>
       </div>
       <div style="border:1px dashed var(--purple-soft);padding:10px;border-radius:10px">
+        <strong>🎨 AI新規イラスト制作（非公開）</strong>
+        <p style="font-size:12px">Cloudflare無料枠の画像AIに接続できれば、作品指示から4枚を制作・保存し、そのまま下の5枚紹介素材へ引き継げます。接続未設定時は実行しません。</p>
+        <textarea id="ig-generate-prompt" placeholder="例：A mysterious Japanese shrine in moonlight, vermilion torii gate, purple fog, cinematic illustration..." style="min-height:95px"></textarea>
+        <button type="button" class="revise-btn" onclick="generateArtworkFour('${w.id}')">✨ AIで原画4枚を生成して登録（非公開）</button>
+        <p id="ig-generate-status" role="status">画像生成接続：未確認</p>
         <strong>🎨 壁紙4枚から5枚の紹介素材を自動制作（非公開）</strong>
         <p style="font-size:12px">壁紙4枚を順番に選択。画像自体は生成AIで描き直さず、表紙とスマホ使用イメージ4枚を自動組版して保存します。</p>
         <input type="file" id="ig-artwork-four" accept="image/jpeg,image/png,image/webp" multiple style="max-width:100%">
@@ -952,6 +957,48 @@ function prepareNewCarouselFromPrevious(id){
  persist();render();
 }
 
+async function requestNewArtwork(payload){
+ if(typeof window.requestArtworkGenerate!=="function")throw Error("画像生成の認証接続が準備できていません");
+ return window.requestArtworkGenerate(payload);
+}
+async function generateArtworkFour(id){
+ const w=carouselWork(id),el=document.getElementById("ig-generate-status");
+ if(!w||!el)return;
+ if(["preparing","prepared","approved","publishing","published"].includes(w.instagramCarousel?.status)){el.textContent="承認中・公開済み投稿は変更しません。空の新規下書きを開始してください。";return;}
+ const promptText=(document.getElementById("ig-generate-prompt")?.value||"").trim();
+ if(promptText.length<20||promptText.length>1200){el.textContent="画像の制作指示を20〜1200文字で入力してください。";return;}
+ const button=Array.from(document.querySelectorAll("button")).find(b=>b.getAttribute("onclick")==="generateArtworkFour('"+id+"')");
+ if(button)button.disabled=true;
+ try{
+  const st=await requestNewArtwork({action:"status"});
+  if(!st.configured){el.textContent="Cloudflareの無料枠の接続情報が未設定です。設定完了後に利用できます。";return;}
+  const generated=w.instagramAiGenerated||{prompt:"",image_urls:[]};
+  if(generated.prompt&&generated.prompt!==promptText&&generated.image_urls.length){el.textContent="保存済み生成画像と指示が異なります。新しい空の下書きを開始してください。";return;}
+  const urls=[...(generated.image_urls||[])];
+  for(let i=urls.length;i<4;i++){
+   el.textContent="AIで原画を制作・保存中 "+(i+1)+"/4";
+   const result=await requestNewArtwork({action:"generate",prompt:promptText+"\nVariant "+(i+1)+": distinct composition and viewpoint, original artwork, no text, portrait phone wallpaper",seed:i+1});
+   if(!result.image_url)throw Error("原画のURLが返りませんでした");
+   urls.push(result.image_url);
+   w.instagramAiGenerated={prompt:promptText,image_urls:[...urls]};
+   persist();
+  }
+  // Copy generated four image references into the editor without publishing;
+  // reuse the existing 4-to-5 mockup generator via local File objects.
+  const fileInput=document.getElementById("ig-artwork-four");
+  if(!fileInput||typeof DataTransfer==="undefined")throw Error("画像選択欄への自動引き継ぎに未対応です");
+  const transfer=new DataTransfer();
+  for(let i=0;i<4;i++){
+   const response=await fetch(urls[i]);if(!response.ok)throw Error("原画"+(i+1)+"を取得できません");
+   const bytes=await response.blob();
+   transfer.items.add(new File([bytes],"ai-artwork-"+(i+1)+".jpg",{type:bytes.type||"image/jpeg"}));
+  }
+  fileInput.files=transfer.files;
+  el.textContent="✓ AI原画4枚を制作済み。5枚の紹介素材を自動作成中…";
+  await buildInstagramMockups(id);
+ }catch(error){el.textContent="生成停止："+(error.message||String(error))+"。成功した原画は保存済み。公開はしていません。";}
+ finally{if(button)button.disabled=false;}
+}
 async function buildInstagramMockups(id){
  const w=carouselWork(id),input=document.getElementById("ig-artwork-four"),status=document.getElementById("ig-artwork-result");
  if(!w||!input||!status)return;
@@ -1844,6 +1891,16 @@ async function requestInstagramCarousel(payload){
  return result;
 }
 window.requestInstagramCarousel=requestInstagramCarousel;
+async function requestArtworkGenerate(payload){
+ const user=auth.currentUser;if(!user)throw Error("Googleログインが必要です");
+ const token=await user.getIdToken(true);
+ const response=await fetch("https://lkynzlittlxhbpvnuajw.supabase.co/functions/v1/instagram-artwork-generate",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify(payload)});
+ const result=await response.json().catch(()=>({}));
+ if(!response.ok)throw Error(result.error||"画像生成サーバーへの接続エラー");
+ return result;
+}
+window.requestArtworkGenerate=requestArtworkGenerate;
+
 
 
 async function requestInstagramPreview(image_url,caption){
