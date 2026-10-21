@@ -1101,8 +1101,10 @@ async function finalizeInstagramCarousel(id){
    key=crypto.randomUUID();
    const base={project_id:id,request_key:key,caption,image_urls:a.image_urls};
    e.textContent="5枚の申請と承認を登録中…";
+   w.instagramCarousel={...a,caption,request_key:key,status:"preparing"};persist();
    const prep=await window.requestInstagramCarousel({...base,action:"prepare"});
    if(!prep.prepared)throw Error("申請登録を確認できません");
+   w.instagramCarousel={...w.instagramCarousel,status:"prepared"};persist();
    const approval=await window.requestInstagramCarousel({...base,action:"approve",confirmation:"このカルーセル投稿の5枚と文章を承認する"});
    if(!approval.approved)throw Error("サーバー承認を確認できません");
    w.instagramCarousel={...a,caption,request_key:key,status:"approved"};persist();
@@ -1125,6 +1127,7 @@ async function publishInstagramCarousel(id){
  if(phrase!=="この承認済みの5枚をInstagramに公開する")return;
  e.textContent="Instagram公開処理中。再実行しないでください";
  try{
+  w.instagramCarousel={...a,status:"publishing"};persist();
   const result=await window.requestInstagramCarousel({action:"publish",project_id:id,request_key:a.request_key,confirmation:phrase});
   if(!result.published)throw Error("公開が確認できません");
   w.instagramCarousel={...a,status:"published",media_id:result.media_id};persist();e.textContent="✓ 公開成功応答 Meta ID："+result.media_id;
