@@ -441,6 +441,7 @@ function renderDetail(){
     ${renderOrchestratorPanel(w)}
     ${renderApprovalPanel(w)}
     ${renderInstagramWorkspace(w)}
+    ${renderEtsyDraftPanel(w)}
     ${renderInstagramDiagnostics(w)}
     ${renderShirabePanel(w)}
     ${renderEmployeePanel(w,"saku","🎨 サク","制作・商品画像","シラベの結果をもとに、商品制作案・画像構成・モックアップ改善案を提案してください。")}
@@ -757,6 +758,36 @@ async function runInstagramPrepareDiagnostic(){
     output.textContent=log.join("\n")+"\n※公開・承認操作はしていません。";
   }catch(err){output.textContent=log.join("\n")+"\nテスト中断："+(err.message||String(err));}
   finally{if(button)button.disabled=false;}
+}
+function renderEtsyDraftPanel(w){
+ const draft=w.etsyDraft||{};
+ const kaku=String(w.ai?.kaku?.result||"").trim();
+ const desc=draft.description||kaku;
+ return '<section class="ai-panel" id="etsy-draft-panel">'+
+ '<h3>🛍 Etsy 出品準備（非公開）</h3>'+
+ '<p>カクの成果を出品用メモへまとめます。EtsyのAPI連携・出品実行はまだ未接続で、ここで保存しても販売サイトは変更されません。</p>'+
+ '<label>商品タイトル案</label><input id="etsy-draft-title" style="width:100%" value="'+escapeHtml(draft.title||w.name)+'">'+
+ '<label>説明文・タグ・制作仕様（カクの成果を引用）</label>'+
+ '<textarea id="etsy-draft-description" style="min-height:180px">'+escapeHtml(desc)+'</textarea>'+
+ '<div class="approval-actions"><button type="button" class="revise-btn" onclick="saveEtsyPreparation(\''+w.id+'\')">💾 Etsy出品メモを保存（非公開）</button>'+
+ '<button type="button" class="revise-btn" onclick="copyEtsyPreparation(\''+w.id+'\')">📋 Etsy用の文面をコピー</button></div>'+
+ '<p id="etsy-draft-status" role="status">'+(draft.saved_at?'✓ 出品メモ保存済み。Etsy未反映。':'未保存。外部公開なし。')+'</p>'+
+ '</section>';
+}
+function saveEtsyPreparation(id){
+ const w=state.works.find(x=>x.id===id),el=document.getElementById("etsy-draft-status");if(!w||!el)return;
+ const title=(document.getElementById("etsy-draft-title")?.value||"").trim();
+ const description=(document.getElementById("etsy-draft-description")?.value||"").trim();
+ if(!title||!description){el.textContent="タイトルと説明を入力してください。";return;}
+ w.etsyDraft={title,description,saved_at:new Date().toISOString(),published:false};persist();
+ el.textContent="✓ 出品メモを保存しました。Etsyには反映していません。";
+}
+async function copyEtsyPreparation(id){
+ const title=document.getElementById("etsy-draft-title")?.value||"";
+ const description=document.getElementById("etsy-draft-description")?.value||"";
+ const el=document.getElementById("etsy-draft-status");
+ try{await navigator.clipboard.writeText("TITLE:\n"+title+"\n\nDESCRIPTION AND TAGS:\n"+description);if(el)el.textContent="出品準備文面をコピーしました（Etsy未反映）。";}
+ catch{if(el)el.textContent="コピーできません。入力欄から手動コピーしてください。";}
 }
 function renderInstagramWorkspace(w){
   const draft=w.instagramStandalone||{};
