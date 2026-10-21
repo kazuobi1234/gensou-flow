@@ -936,6 +936,7 @@ function startEmptyCarouselDraft(id){
   w.instagramCarouselHistory=w.instagramCarouselHistory||[];
   if(!w.instagramCarouselHistory.some(h=>h.request_key===old.request_key))w.instagramCarouselHistory.push({...old});
  }
+ delete w.instagramMockupProgress;
  w.instagramCarousel={image_urls:[],caption:"",status:"draft",request_key:null,source:"new-artwork"};
  persist();render();
 }
@@ -986,8 +987,12 @@ async function buildInstagramMockups(id){
    g.font="22px sans-serif";g.fillText("KUNOGI STUDIO  •  0"+(i+1),540,1300);
    canvases.push(c);
   }
-  const uploaded=[];
-  for(let i=0;i<5;i++){
+  const fileSignatures=files.map(f=>f.name+":"+f.size+":"+f.lastModified);
+  const saved=w.instagramMockupProgress;
+  if(saved?.image_urls?.length&&JSON.stringify(saved.source_files)!==JSON.stringify(fileSignatures))throw Error("前回と異なる4枚が選択されています。元の4枚を選ぶか、新しい空の下書きを開始してください");
+  const uploaded=Array.isArray(saved?.image_urls)?[...saved.image_urls]:[];
+  if(uploaded.length>5)throw Error("保存済みの画像数が不正です");
+  for(let i=uploaded.length;i<5;i++){
    status.textContent="5枚の画像を作成・保存中 "+(i+1)+"/5";
    const blob=await new Promise(resolve=>canvases[i].toBlob(resolve,"image/jpeg",0.88));
    if(!blob)throw Error("JPEG出力に失敗しました");
@@ -995,7 +1000,7 @@ async function buildInstagramMockups(id){
    const result=await window.requestInstagramImageUpload(file);
    if(!result?.image_url)throw Error("保存先URLがありません");
    uploaded.push(result.image_url);
-   w.instagramMockupProgress={image_urls:[...uploaded],created_at:new Date().toISOString()};persist();
+   w.instagramMockupProgress={image_urls:[...uploaded],source_files:files.map(f=>f.name+":"+f.size+":"+f.lastModified),created_at:new Date().toISOString()};persist();
   }
   delete w.instagramMockupProgress;
   const caption=(document.getElementById("ig-carousel-caption")?.value||"").trim();
