@@ -784,16 +784,22 @@ function renderInstagramWorkspace(w){
     <div class="approval-actions"><button type="button" class="revise-btn" onclick="checkSavedInstagramImage('${w.id}')">🔎 保存済み画像を自動検査（非公開）</button></div>
     <div class="approval-actions"><button type="button" class="approve-btn" onclick="convertSavedInstagramImage('${w.id}')">🖼️ 保存済みPNGをJPEG版に変換・別保存（非公開）</button></div>
     <p id="ig-saved-image-check" role="status">以前アップロードした画像も選び直さず検査できます。</p>
+    <div style="border:1px solid var(--purple-soft);padding:12px;border-radius:10px;margin:12px 0">
+      <strong>✅ Instagram投稿専用の決裁（旧企画案とは別）</strong>
+      <p style="color:var(--text-dim)">この決裁は現在の投稿文と保存済み画像1枚だけを対象とし、Instagramへ公開しません。変更後は再承認が必要です。</p>
+      <p id="ig-editorial-state" role="status">${w.instagramEditorial?.approved ? "専用承認記録あり（内容一致は実行時に照合）" : "Instagram投稿は未承認"}</p>
+      <button type="button" class="approve-btn" onclick="approveInstagramEditorial('${w.id}')">✅ 現在の投稿文と画像だけ承認（公開なし）</button>
+    </div>
     <label>承認後の画像付き投稿下書き</label>
     <textarea id="ig-caption" placeholder="投稿文を入力してください">${escapeHtml(caption)}</textarea>
     <div class="approval-actions">
-      <button class="revise-btn" onclick="saveInstagramDraft('${w.id}')" ${approved?"":"disabled"}>💾 画像付き下書きを保存</button>
-      <button class="approve-btn" onclick="previewInstagramPost('${w.id}')" ${approved?"":"disabled"}>🔎 投稿前チェック（公開なし）</button>
+      <button class="revise-btn" onclick="saveInstagramDraft('${w.id}')">💾 画像付き下書きを保存</button>
+      <button class="approve-btn" onclick="previewInstagramPost('${w.id}')">🔎 投稿前チェック（公開なし）</button>
     </div>
     <p id="ig-preview-result" role="status"></p>
     <div class="approval-actions">
-      <button class="approve-btn" onclick="prepareInstagramApproval('${w.id}')" ${approved?"":"disabled"}>🔐 投稿申請をサーバーへ登録（非公開）</button>
-      <button class="revise-btn" onclick="approveInstagramServerSide('${w.id}')" ${approved?"":"disabled"}>✅ 投稿内容をサーバー承認（非公開）</button>
+      <button class="approve-btn" onclick="prepareInstagramApproval('${w.id}')">🔐 投稿申請をサーバーへ登録（非公開）</button>
+      <button class="revise-btn" onclick="approveInstagramServerSide('${w.id}')">✅ 投稿内容をサーバー承認（非公開）</button>
     </div>
     <p id="ig-server-status" role="status">Instagramには公開されません。申請登録 → 内容を確認 → サーバー承認の順で操作します。</p>
     <div style="border:1px solid var(--purple-soft);padding:12px;border-radius:10px;margin-top:12px">
@@ -806,6 +812,23 @@ function renderInstagramWorkspace(w){
     </div>
   </section>`;
 }
+function currentInstagramEditorial(w){
+ const text=(document.getElementById("ig-caption")?.value||"").trim();
+ const image=(document.getElementById("ig-image-url")?.value||"").trim();
+ return {caption:text,image_url:image};
+}
+function editorialMatches(w){
+ const v=currentInstagramEditorial(w),a=w?.instagramEditorial;
+ return !!(a?.approved&&a.caption===v.caption&&a.image_url===v.image_url);
+}
+function approveInstagramEditorial(workId){
+ const w=state.works.find(x=>x.id===workId);if(!w)return;
+ const v=currentInstagramEditorial(w),out=document.getElementById("ig-editorial-state");
+ if(!v.caption||!v.image_url){if(out)out.textContent="投稿文と保存済み画像が必要です。";return;}
+ if(!confirm("現在のInstagram投稿文と保存済み画像1枚のみを承認記録しますか？外部公開は行いません。"))return;
+ w.instagramEditorial={...v,approved:true,approved_at:new Date().toISOString()};
+ persist();if(out)out.textContent="✓ Instagram専用承認を保存しました。Instagramには投稿していません。";
+}
 async function sendInstagramGuard(payload){
   if(typeof window.requestInstagramGuard!=="function")throw new Error("認証接続の準備ができていません");
   return window.requestInstagramGuard(payload);
@@ -813,7 +836,7 @@ async function sendInstagramGuard(payload){
 async function prepareInstagramApproval(workId){
   const w=state.works.find(x=>x.id===workId),output=document.getElementById("ig-server-status");
   if(!w||!output)return;
-  if(w.approval?.status!=="承認"){output.textContent="まず決裁欄で承認してください。";return;}
+  if(!editorialMatches(w)){output.textContent="Instagram専用の投稿承認が必要です。内容を変更した場合は再承認してください。";return;}
   const caption=document.getElementById("ig-caption")?.value.trim()||"";
   const image_url=document.getElementById("ig-image-url")?.value.trim()||"";
   if(!caption||!image_url){output.textContent="投稿文と画像URLが必要です。";return;}
@@ -831,7 +854,7 @@ async function approveInstagramServerSide(workId){
   const w=state.works.find(x=>x.id===workId),output=document.getElementById("ig-server-status");
   if(!w||!output)return;
   const pending=w.instagramPublishRequest;
-  if(w.approval?.status!=="承認"||!pending){output.textContent="先に承認と申請登録が必要です。";return;}
+  if(!editorialMatches(w)||!pending){output.textContent="Instagram専用承認と申請登録が必要です。";return;}
   const caption=document.getElementById("ig-caption")?.value.trim()||"";
   const image_url=document.getElementById("ig-image-url")?.value.trim()||"";
   if(caption!==pending.caption||image_url!==pending.image_url){output.textContent="申請後に内容が変更されています。新しく申請登録してください。";return;}
@@ -855,7 +878,7 @@ function saveStandaloneInstagramDraft(workId){
 }
 function saveInstagramDraft(workId){
   const w=state.works.find(x=>x.id===workId);
-  if(!w||!w.approval||w.approval.status!=="承認"){alert("先に社長の承認が必要です。");return;}
+  if(!w||!editorialMatches(w)){alert("Instagram専用の投稿承認が必要です。");return;}
   const image_url=(document.getElementById("ig-image-url")?.value||"").trim();
   const caption=(document.getElementById("ig-caption")?.value||"").trim();
   if(!image_url||!caption){alert("画像と投稿文を用意してください。");return;}
@@ -919,7 +942,7 @@ async function previewInstagramPost(workId){
   const w=state.works.find(x=>x.id===workId);
   const output=document.getElementById("ig-preview-result");
   if(!w||!output)return;
-  if(!w.approval||w.approval.status!=="承認"){output.textContent="先に社長の承認が必要です。";return;}
+  if(!editorialMatches(w)){output.textContent="Instagram専用の投稿承認が必要です。";return;}
   const image_url=document.getElementById("ig-image-url").value.trim();
   const caption=document.getElementById("ig-caption").value.trim();
   output.textContent="確認中…";
