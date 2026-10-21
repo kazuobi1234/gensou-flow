@@ -817,10 +817,10 @@ function renderInstagramWorkspace(w){
     </div>
     <div style="border:1px solid var(--purple-soft);padding:12px;border-radius:10px;margin-top:12px">
       <strong>🔐 Instagram自動公開の準備状況</strong>
-      <p style="color:var(--text-dim)">現在は投稿文・画像の準備、公開前チェック、サーバー承認までです。承認済みの単一画像投稿に限り公開APIに接続済みです。実際の投稿成功は未検証です。5枚カルーセルには対応していません。</p>
+      <p style="color:var(--text-dim)">現在は投稿文・画像の準備、公開前チェック、サーバー承認までです。承認済みの単一画像投稿に限り公開APIに接続済みです。実際の投稿成功は未検証です。5枚カルーセルは上の専用欄に実装済みです。</p>
       <p>投稿先：<strong>@kunogistudio</strong> ／ 公開状態：<strong>未公開</strong></p>
       <p>必要な条件：①本人認証 ②承認済み内容との照合 ③画像URLの検査 ④二重投稿防止 ⑤公開後のMeta ID記録</p>
-      <button type="button" class="approve-btn" onclick="publishApprovedInstagramPost('${w.id}')">🚀 承認済みの画像1枚をInstagramへ公開（最終確認あり）</button><p id="ig-publish-result" role="status">このボタンを押すと公開確認画面が出ます。確認前は投稿されません。</p>
+      <button type="button" class="approve-btn" onclick="publishApprovedInstagramPost('${w.id}')" ${w.name==="狐月｜販売改善"?"disabled":""}>🚀 承認済みの画像1枚をInstagramへ公開（最終確認あり）</button><p id="ig-publish-result" role="status">${w.name==="狐月｜販売改善"?"狐月は5枚カルーセルを完成させる方針のため、旧1枚投稿ボタンを停止しています。":"このボタンを押すと公開確認画面が出ます。確認前は投稿されません。"}</p>
       <p style="color:var(--text-dim)">旧APIは使用せず、承認済み申請と完全一致する内容だけを新しい専用APIへ送信します。公開に失敗した場合は再試行せず状態を確認してください。</p>
     </div>
   </section>`;
