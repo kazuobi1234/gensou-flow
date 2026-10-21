@@ -933,7 +933,7 @@ function prepareNewCarouselFromPrevious(id){
  if(!previous?.image_urls||previous.image_urls.length!==5){alert("再利用可能な5枚がありません");return;}
  if(!confirm("以前の5枚を再利用した、新しい未承認の下書きを作りますか？旧公開記録は保持します。"))return;
  w.instagramCarouselHistory=w.instagramCarouselHistory||[];
- if(previous.status==="published"&&!w.instagramCarouselHistory.some(h=>h.request_key===previous.request_key))w.instagramCarouselHistory.push({...previous});
+ if(["approved","publishing","published"].includes(previous.status)&&!w.instagramCarouselHistory.some(h=>h.request_key===previous.request_key))w.instagramCarouselHistory.push({...previous});
  w.instagramCarousel={image_urls:[...previous.image_urls],caption:previous.caption,status:"draft",request_key:null};
  persist();render();
 }
@@ -990,7 +990,7 @@ function carouselWork(id){return state.works.find(w=>w.id===id)}
 function updateCarouselStatus(message){const e=document.getElementById("ig-carousel-status");if(e)e.textContent=message}
 function moveInstagramCarouselImage(id,i,delta){
  const w=carouselWork(id),a=w?.instagramCarousel?.image_urls||[],j=i+delta;
- if(j<0||j>=a.length||w.instagramCarousel.status==="published")return;
+ if(j<0||j>=a.length||["approved","publishing","published"].includes(w.instagramCarousel.status))return;
  [a[i],a[j]]=[a[j],a[i]];w.instagramCarousel={...w.instagramCarousel,image_urls:a,status:"draft",request_key:null};persist();render();
 }
 function resetInstagramCarouselImages(id){
@@ -1012,7 +1012,7 @@ async function addInstagramCarouselImages(id){
  const w=carouselWork(id),input=document.getElementById("ig-carousel-files");if(!w||!input)return;
  if(["approved","publishing","published"].includes(w.instagramCarousel?.status))return updateCarouselStatus("承認済み投稿の画像は変更できません。新規下書きを作成してください。");
  const files=Array.from(input.files||[]),old=w.instagramCarousel||{image_urls:[],caption:"",status:"draft"};
- if(old.status==="published")return updateCarouselStatus("公開済みの申請は変更できません");
+ if(["approved","publishing","published"].includes(old.status))return updateCarouselStatus("承認済み・処理中・公開済みの申請は変更できません");
  if(!files.length||files.length+old.image_urls.length>5)return updateCarouselStatus("合計5枚になるように選択してください");
  const button=input.parentElement.querySelector('button[onclick^="addInstagramCarouselImages"]');button.disabled=true;
  try{
