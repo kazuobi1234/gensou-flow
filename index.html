@@ -804,6 +804,13 @@ function renderInstagramWorkspace(w){
     <p id="ig-server-status" role="status">Instagramには公開されません。申請登録 → 内容を確認 → サーバー承認の順で操作します。</p>
     <div style="border:1px solid var(--purple-soft);padding:12px;border-radius:10px;margin:15px 0">
       <h3>🎠 Instagram 5枚カルーセル投稿</h3>
+      <div style="border:1px dashed var(--purple-soft);padding:10px;border-radius:10px">
+        <strong>🎨 壁紙4枚から5枚の紹介素材を自動制作（非公開）</strong>
+        <p style="font-size:12px">壁紙4枚を順番に選択。画像自体は生成AIで描き直さず、表紙とスマホ使用イメージ4枚を自動組版して保存します。</p>
+        <input type="file" id="ig-artwork-four" accept="image/jpeg,image/png,image/webp" multiple style="max-width:100%">
+        <button type="button" class="revise-btn" onclick="buildInstagramMockups('${w.id}')">🪄 5枚を制作して下書きに登録（非公開）</button>
+        <p id="ig-artwork-result" role="status">元の壁紙は変更しません。</p>
+      </div>
       <div class="approval-actions"><button type="button" class="revise-btn" onclick="inheritCarouselFromEmployees('${w.id}')">🤖 AI社員の投稿文を下書きへ反映（非公開）</button><button type="button" class="revise-btn" onclick="prepareNewCarouselFromPrevious('${w.id}')">📋 前回の画像5枚で新規下書きを作成（非公開）</button></div>
       <p style="font-size:12px;opacity:.8">ヨウの投稿文は成果保存時に下書きへ自動反映。サクの成果に専用StorageのJPEG公開URLがちょうど5件あれば自動で画像も登録。実画像の生成・書き込みは別工程です。承認済み・公開済みの内容は変更しません。</p>
       <p>表紙1枚＋スマホモックアップ4枚を順番に登録。旧1枚投稿とは別管理。保存・申請・承認では投稿されません。</p>
@@ -922,6 +929,55 @@ function prepareNewCarouselFromPrevious(id){
  if(previous.status==="published"&&!w.instagramCarouselHistory.some(h=>h.request_key===previous.request_key))w.instagramCarouselHistory.push({...previous});
  w.instagramCarousel={image_urls:[...previous.image_urls],caption:previous.caption,status:"draft",request_key:null};
  persist();render();
+}
+
+async function buildInstagramMockups(id){
+ const w=carouselWork(id),input=document.getElementById("ig-artwork-four"),status=document.getElementById("ig-artwork-result");
+ if(!w||!input||!status)return;
+ if(w.instagramCarousel?.status==="approved"||w.instagramCarousel?.status==="published"){status.textContent="承認済み・公開済みの投稿は変更できません。新規下書きを作成してください。";return;}
+ const files=Array.from(input.files||[]);
+ if(files.length!==4||files.some(f=>!["image/png","image/jpeg","image/webp"].includes(f.type)||f.size>10000000)){status.textContent="JPEG・PNG・WebPの元画像4枚（各10MB以下）が必要です";return;}
+ if((w.instagramCarousel?.image_urls||[]).length&&!confirm("現在の未承認画像5枚を、新しく制作した5枚に置き換えますか？"))return;
+ const btn=input.nextElementSibling;btn.disabled=true;
+ let bitmaps=[];
+ try{
+  status.textContent="元画像4枚を準備中…";
+  bitmaps=await Promise.all(files.map(f=>createImageBitmap(f)));
+  if(bitmaps.some(b=>b.width*b.height>36000000))throw Error("画像の解像度が大きすぎます");
+  const title="狐月 / KOGE T S U";
+  const makeCanvas=(width,height)=>{const c=document.createElement("canvas");c.width=width;c.height=height;return [c,c.getContext("2d")];};
+  const cover=makeCanvas(1080,1350),cc=cover[1];cc.fillStyle="#130c23";cc.fillRect(0,0,1080,1350);
+  cc.fillStyle="#f5ddc3";cc.textAlign="center";cc.font="bold 66px serif";cc.fillText("狐月",540,110);cc.font="30px serif";cc.fillText("KOGE T S U  |  KUNOGI STUDIO",540,162);
+  const drawFit=(c,b,x,y,ww,hh)=>{const scale=Math.min(ww/b.width,hh/b.height);const dw=b.width*scale,dh=b.height*scale;c.drawImage(b,x+(ww-dw)/2,y+(hh-dh)/2,dw,dh);};
+  for(let i=0;i<4;i++){const x=35+i*260,y=245;cc.fillStyle="#30223d";cc.fillRect(x,y,245,930);drawFit(cc,bitmaps[i],x,y,245,930);cc.font="22px sans-serif";cc.fillStyle="#e9d4c5";cc.fillText("0"+(i+1),x+122,1210);}
+  cc.font="27px sans-serif";cc.fillText("4 JAPANESE FANTASY PHONE WALLPAPERS",540,1280);
+  const canvases=[cover[0]];
+  for(let i=0;i<4;i++){
+   const [c,g]=makeCanvas(1080,1350);
+   g.fillStyle="#130c23";g.fillRect(0,0,1080,1350);
+   g.fillStyle="#372c40";g.fillRect(165,85,750,1170);
+   g.fillStyle="#05060c";g.beginPath();g.roundRect(206,105,668,1130,64);g.fill();
+   g.save();g.beginPath();g.roundRect(224,133,632,1070,38);g.clip();
+   const b=bitmaps[i],scale=Math.max(632/b.width,1070/b.height);
+   g.drawImage(b,540-b.width*scale/2,668-b.height*scale/2,b.width*scale,b.height*scale);g.restore();
+   g.fillStyle="#08090e";g.beginPath();g.roundRect(450,142,180,23,14);g.fill();
+   g.fillStyle="white";g.textAlign="center";g.font="32px sans-serif";g.fillText("09:41",540,245);
+   g.font="22px sans-serif";g.fillText("KOGE T S U  •  0"+(i+1),540,1300);
+   canvases.push(c);
+  }
+  const uploaded=[];
+  for(let i=0;i<5;i++){
+   status.textContent="5枚の画像を作成・保存中 "+(i+1)+"/5";
+   const blob=await new Promise(resolve=>canvases[i].toBlob(resolve,"image/jpeg",0.88));
+   if(!blob)throw Error("JPEG出力に失敗しました");
+   const file=new File([blob],"kogetsu-auto-"+Date.now()+"-"+(i+1)+".jpg",{type:"image/jpeg"});
+   const result=await window.requestInstagramImageUpload(file);
+   if(!result?.image_url)throw Error("保存先URLがありません");
+   uploaded.push(result.image_url);
+  }
+  const caption=(document.getElementById("ig-carousel-caption")?.value||"").trim();
+  w.instagramCarousel={image_urls:uploaded,caption,status:"draft",request_key:null,source:"auto-mockups"};persist();render();
+ }catch(err){status.textContent="制作を中断しました："+(err.message||String(err))+"。元画像はそのままです。途中保存分は投稿されません。";}finally{bitmaps.forEach(b=>b.close?.());btn.disabled=false;}
 }
 function carouselWork(id){return state.works.find(w=>w.id===id)}
 function updateCarouselStatus(message){const e=document.getElementById("ig-carousel-status");if(e)e.textContent=message}
