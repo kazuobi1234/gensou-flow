@@ -19,3 +19,10 @@
 - 本変更はAI社員プロンプトのステータス誤案内修正。Supabase Edge Functionのデプロイは別作業。
 - EtsyまたはInstagramへの公開処理はこの変更に含めない。
 - 本番確認の前に機密情報（APIトークン・認証キー）をGitHubへ書き込まない。
+
+## 本番差分の追加調査（2026-10-24）
+- Supabase project: Kunogi AI Company (lkynzlittlxhbpvnuajw), ACTIVE_HEALTHY。
+- Edge Functions: company-ai v17、instagram-carousel v3、instagram-publish v12、instagram-publish-guard v7、instagram-image-upload v4、instagram-image-check v4 がACTIVE。
+- Supabase 本番 company-ai のコードと GitHub main の company-ai/index.ts の文章が一致しない。GitHub に保存した修正をそのままデプロイしてはいけない。本番の変更を取り込んだ後で修正を適用すること。
+- GitHub PR #50 はドラフトかつ mergeable=false。本番や main への反映は保留。
+- 公開なしで検証するまでは「完全連携完成」と呼ばない。
