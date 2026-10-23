@@ -1602,16 +1602,30 @@ function prepareCarouselFromCompany(id){
  const old=w.instagramCarousel||{image_urls:[],caption:"",status:"draft"};
  if(["preparing","prepared","approved","publishing","published"].includes(old.status)){el.textContent="既に承認済み・公開済みです。既存の申請は変更しません。新規下書き作成後に実行してください。";return;}
  const proposed=extractYouInstagramCaption(w.ai?.you?.result||"").caption?.trim()||"";
- const caption=old.caption||proposed||w.instagramStandalone?.caption||w.instagramDraft?.caption||"";
+ const caption=proposed||old.caption||w.instagramStandalone?.caption||w.instagramDraft?.caption||"";
  const text=[w.ai?.saku?.result||"",w.ai?.you?.result||""].join("\n");
  const regex=/https:\/\/lkynzlittlxhbpvnuajw\.supabase\.co\/storage\/v1\/object\/public\/instagram-posts\/[^\s<>"')\]]+\.jpe?g/gi;
  const candidates=[...new Set(text.match(regex)||[])];
  const oldUrls=(old.image_urls||[]);
  const urls=oldUrls.length===5?oldUrls:candidates.length===5?candidates:[];
- if(!caption||urls.length!==5){el.textContent="自動準備に必要な素材が不足：投稿文"+(caption?"OK":"なし")+"／画像"+urls.length+"/5。画像4枚の自動制作欄かAI社員の成果を使って補ってください。";return;}
+ if(!caption||urls.length!==5){el.textContent="自動準備に必要な素材が不足：投稿文"+(caption?"OK":"なし")+"／画像"+urls.length+"/5。ヨウの投稿文とサクの画像URL（または保存済みの5枚）を確認してください。";return;}
  w.instagramCarousel={image_urls:[...urls],caption,status:"draft",request_key:null,source:"company-assisted"};
  persist();render();
  const status=document.getElementById("ig-company-prep-status");if(status)status.textContent="✓ AI社員の成果から5枚の下書きを準備しました。未承認・未公開です。";
+}
+function companyCarouselReadiness(w){
+ const a=w?.instagramCarousel||{};
+ const caption=String(a.caption||"").trim();
+ const urls=Array.isArray(a.image_urls)?a.image_urls:[];
+ const safe=urls.length===5&&urls.every(url=>/^https:\/\/lkynzlittlxhbpvnuajw\.supabase\.co\/storage\/v1\/object\/public\/instagram-posts\/[A-Za-z0-9_./%+-]+\.jpe?g$/i.test(url));
+ return {ready:!!caption&&caption.length<=2200&&safe,caption:!!caption,images:urls.length,safe};
+}
+function prepareAndReviewCompanyCarousel(id){
+ const w=state.works.find(x=>x.id===id);if(!w)return;
+ prepareCarouselFromCompany(id);
+ const v=companyCarouselReadiness(state.works.find(x=>x.id===id));
+ const out=document.getElementById("ig-company-prep-status");
+ if(out)out.textContent=v.ready?"✓ 社員の投稿文と5枚の画像URLが揃いました。画像プレビューを確認し、最終公開時に本人承認してください。未公開です。":"不足・未確認：投稿文 "+(v.caption?"あり":"なし")+"／画像 "+v.images+"/5／URL形式 "+(v.safe?"OK":"未確認");
 }
 function syncEmployeeInstagramDraft(w){
  if(!w||["preparing","prepared","approved","publishing","published"].includes(w.instagramCarousel?.status))return false;
