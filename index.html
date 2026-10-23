@@ -1006,9 +1006,12 @@ async function generateArtworkFour(id){
  if(["preparing","prepared","approved","publishing","published"].includes(w.instagramCarousel?.status)){el.textContent="承認中・公開済み投稿は変更しません。空の新規下書きを開始してください。";return;}
  const proposal=String(w.ai?.saku?.result||"").trim();
  const field=document.getElementById("ig-generate-prompt");
- const meaningful=proposal.split(/\r?\n/).map(x=>x.trim()).filter(x=>x&&!/^\||^[-|: ]+$/.test(x)&&!/^くのぎ社長|^お疲れ様|^現在の確認|^API|^Instagram投稿文|^---/.test(x)).filter(x=>/鳥居|神社|狐|月|霧|彼岸花|衣装|風景|デザイン|背景|構図|shrine|torii|moon|fox/i.test(x)).slice(0,9).join("。");
- const promptText=(field?.value?.trim()||("Original Japanese fantasy illustration for a vertical phone wallpaper, detailed atmospheric composition, no typography. "+(meaningful||w.name))).slice(0,1200);
- if(field&&!field.value.trim())field.value=promptText;
+ const meaningful=proposal.split(/\r?\n/).map(x=>x.trim()).filter(x=>x.length>=8&&x.length<=170&&!/^#|^@|^\||^[-|: ]+$|^【|^\*|^くのぎ社長|^お疲れ様|^現在の確認|^API|^Instagram投稿文|^---|^商品詳細|^販売|^投稿|^認証|^ステータス|^実装/.test(x)&&!/リリース|ご提示|業務を遂行|投稿文案|未確認|接続|承認|Etsy|http|Instagram|#|SKU|報告|API/.test(x)).filter(x=>/鳥居|神社|狐面|紅葉|灯籠|満月|彼岸花|霧|石段|湖|風景|構図|shrine|torii|moon|fox mask/i.test(x)).slice(0,5).join("。");
+ const previousPrompt=field?.value?.trim()||"";
+ const contaminated=/ご提示いただいた|業務を遂行|投稿文案|現在の確認状況|#KunogiStudio|Step into a world|Instagram投稿準備/.test(previousPrompt);
+ const fallback="A moonlit ancient Japanese shrine with a weathered red torii, fox mask, autumn maple leaves, stone lanterns and violet mist. Original fantasy artwork, vertical phone wallpaper, no text.";
+ const promptText=(previousPrompt&&!contaminated?previousPrompt:("Original Japanese fantasy illustration for a vertical phone wallpaper, detailed atmospheric composition, no typography. "+(meaningful||fallback))).slice(0,1200);
+ if(field&&(!field.value.trim()||contaminated))field.value=promptText;
  if(promptText.length<20||promptText.length>1200){el.textContent="画像の制作指示を20〜1200文字で入力してください。";return;}
  const button=Array.from(document.querySelectorAll("button")).find(b=>b.getAttribute("onclick")==="generateArtworkFour('"+id+"')");
  if(button)button.disabled=true;
