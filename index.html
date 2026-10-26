@@ -2054,7 +2054,7 @@ window.etsyUploadAsset=etsyUploadAsset;
 
 function makeEtsyEncryptionKey(){
  const bytes=new Uint8Array(32);crypto.getRandomValues(bytes);
- const key=btoa(String.fromCharCode(...bytes)).replace(/\\+/g,"-").replace(/\\//g,"_").replace(/=+$/,"");
+ const key=btoa(String.fromCharCode(...bytes)).split("+").join("-").split("/").join("_").replace(/=+$/,"");
  const el=document.getElementById("etsy-bridge-status");
  navigator.clipboard.writeText(key).then(()=>{if(el)el.textContent="32バイトの鍵をコピーしました。Supabaseの関数Secretsで ETSY_TOKEN_ENCRYPTION_KEY の値に貼り付けて保存してください。チャットには送らないでください。";}).catch(()=>{if(el)el.textContent="コピーに失敗。Samsungブラウザのクリップボード許可を確認してください。";});
 }
