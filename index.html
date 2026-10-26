@@ -774,7 +774,7 @@ function renderEtsyDraftPanel(w){
  '<p id="etsy-draft-status" role="status">'+(draft.saved_at?'✓ 出品メモ保存済み。Etsy未反映。':'Etsyには未反映。')+'</p>'+
  '<h4>🔌 Etsy API 接続と販売分析</h4>'+
  '<div class="approval-actions"><button type="button" class="revise-btn" onclick="etsyBridgeStatus()">接続状態を確認</button>'+
- '<button type="button" class="revise-btn" onclick="etsyBridgeOrders()">注文集計を取得</button><button type="button" class="revise-btn" onclick="startEtsyAuthorization()">Etsyショップ認証</button></div>'+
+ '<button type="button" class="revise-btn" onclick="etsyBridgeOrders()">注文集計を取得</button><button type="button" class="revise-btn" onclick="etsyDiscoverShop()">ショップ番号を自動確認</button><button type="button" class="revise-btn" onclick="startEtsyAuthorization()">Etsyショップ認証</button></div>'+
  '<p id="etsy-bridge-status" role="status">接続は未確認です。注文数は利益ではありません。</p>'+
  '<div class="approval-actions"><button type="button" class="revise-btn" onclick="makeEtsyEncryptionKey()">🔐 保存用の鍵を生成してコピー</button></div><p>生成した鍵はSupabaseの Edge Function Secrets に、名前 ETSY_TOKEN_ENCRYPTION_KEY で登録します。チャットには送らないでください。</p>'+
  '<h4>🧾 非公開下書き登録（本人承認必須）</h4>'+
@@ -2060,6 +2060,15 @@ function makeEtsyEncryptionKey(){
 }
 window.makeEtsyEncryptionKey=makeEtsyEncryptionKey;
 
+async function etsyDiscoverShop(){
+ const el=document.getElementById("etsy-bridge-status");if(!el)return;
+ el.textContent="Etsyのショップ番号を確認中…";
+ try{
+  const d=await requestEtsyBridge({action:"discover_shop"});
+  el.textContent=d.shop_found?"ショップ："+d.shop_name+" ／ ショップ番号："+d.shop_id+"。出品操作にはETSY_SHOP_IDへの登録が必要です。":"ショップ番号を確認できません";
+ }catch(e){el.textContent="ショップ確認失敗："+e.message;}
+}
+window.etsyDiscoverShop=etsyDiscoverShop;
 async function etsyBridgeStatus(){
  const el=document.getElementById("etsy-bridge-status");if(!el)return;
  el.textContent="Etsy接続を確認中";
