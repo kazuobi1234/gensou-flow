@@ -771,7 +771,7 @@ function renderEtsyDraftPanel(w){
  '<p id="etsy-draft-status" role="status">'+(draft.saved_at?'✓ 出品メモ保存済み。Etsy未反映。':'Etsyには未反映。')+'</p>'+
  '<h4>🔌 Etsy API 接続と販売分析</h4>'+
  '<div class="approval-actions"><button type="button" class="revise-btn" onclick="etsyBridgeStatus()">接続状態を確認</button>'+
- '<button type="button" class="revise-btn" onclick="etsyBridgeOrders()">注文集計を取得</button></div>'+
+ '<button type="button" class="revise-btn" onclick="etsyBridgeOrders()">注文集計を取得</button><button type="button" class="revise-btn" onclick="startEtsyAuthorization()">Etsyショップ認証</button></div>'+
  '<p id="etsy-bridge-status" role="status">接続は未確認です。注文数は利益ではありません。</p>'+
  '<h4>🧾 非公開下書き登録（本人承認必須）</h4>'+
  '<p>商品カテゴリIDと制作時期はEtsyの実際の分類を確認して入力してください。デジタル商品を前提にしています。</p>'+
@@ -1966,6 +1966,26 @@ async function requestEtsyBridge(payload){
  const json=await res.json().catch(()=>({}));if(!res.ok||!json.ok)throw Error(json.error||"Etsy APIの確認に失敗しました");
  return json;
 }
+async function startEtsyAuthorization(){
+ const el=document.getElementById("etsy-bridge-status");
+ try{
+  if(el)el.textContent="Etsy認証URLを作成中…";
+  const result=await requestEtsyBridge({action:"begin"});
+  location.assign(result.authorization_url);
+ }catch(e){if(el)el.textContent="認証開始不可："+e.message;}
+}
+window.startEtsyAuthorization=startEtsyAuthorization;
+async function completeEtsyAuthorization(){
+ const params=new URLSearchParams(location.search);
+ const code=params.get("code"),state=params.get("state"),error=params.get("error");
+ if(!code&&!error)return;
+ history.replaceState(null,"",location.pathname+location.hash);
+ if(error){alert("Etsy認証は許可されませんでした。");return;}
+ try{
+  await requestEtsyBridge({action:"complete",code,state});
+  alert("Etsyとの認証結果を保存しました。");
+ }catch(e){alert("認証が完了していません："+e.message);}
+}
 async function etsyBridgeStatus(){
  const el=document.getElementById("etsy-bridge-status");if(!el)return;
  el.textContent="Etsy接続を確認中";
@@ -2296,6 +2316,7 @@ await loadWorksFromCloud();
 startLiveCloudSync(user);
 render();
 renderAccountStatus(user);
+await completeEtsyAuthorization();
   } else {
     if(liveSyncStop){liveSyncStop();liveSyncStop=null;}cloudSyncBlocked=true;cloudBaseline=null;
     console.log("未ログイン");
