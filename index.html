@@ -776,6 +776,7 @@ function renderEtsyDraftPanel(w){
  '<div class="approval-actions"><button type="button" class="revise-btn" onclick="etsyBridgeStatus()">接続状態を確認</button>'+
  '<button type="button" class="revise-btn" onclick="etsyBridgeOrders()">注文集計を取得</button><button type="button" class="revise-btn" onclick="startEtsyAuthorization()">Etsyショップ認証</button></div>'+
  '<p id="etsy-bridge-status" role="status">接続は未確認です。注文数は利益ではありません。</p>'+
+ '<div class="approval-actions"><button type="button" class="revise-btn" onclick="makeEtsyEncryptionKey()">🔐 保存用の鍵を生成してコピー</button></div><p>生成した鍵はSupabaseの Edge Function Secrets に、名前 ETSY_TOKEN_ENCRYPTION_KEY で登録します。チャットには送らないでください。</p>'+
  '<h4>🧾 非公開下書き登録（本人承認必須）</h4>'+
  '<p>商品カテゴリIDと制作時期はEtsyの実際の分類を確認して入力してください。デジタル商品を前提にしています。</p>'+
  '<label>価格（ショップ通貨）</label><input id="etsy-price" type="number" min="0.01" step="0.01" placeholder="Etsyショップ通貨の価格" style="width:100%">'+
@@ -2050,6 +2051,14 @@ async function etsyUploadAsset(action){
 }
 window.etsyVerifyListing=etsyVerifyListing;
 window.etsyUploadAsset=etsyUploadAsset;
+
+function makeEtsyEncryptionKey(){
+ const bytes=new Uint8Array(32);crypto.getRandomValues(bytes);
+ const key=btoa(String.fromCharCode(...bytes)).replace(/\\+/g,"-").replace(/\\//g,"_").replace(/=+$/,"");
+ const el=document.getElementById("etsy-bridge-status");
+ navigator.clipboard.writeText(key).then(()=>{if(el)el.textContent="32バイトの鍵をコピーしました。Supabaseの関数Secretsで ETSY_TOKEN_ENCRYPTION_KEY の値に貼り付けて保存してください。チャットには送らないでください。";}).catch(()=>{if(el)el.textContent="コピーに失敗。Samsungブラウザのクリップボード許可を確認してください。";});
+}
+window.makeEtsyEncryptionKey=makeEtsyEncryptionKey;
 
 async function etsyBridgeStatus(){
  const el=document.getElementById("etsy-bridge-status");if(!el)return;
