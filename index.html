@@ -1993,6 +1993,9 @@ async function etsyCreateDraft(id){
  }catch(e){el.textContent="作成結果を確認できません："+e.message+"。Etsy管理画面で確認するまで再実行しないでください。";}
 }
 
+window.etsyBridgeStatus=etsyBridgeStatus;
+window.etsyBridgeOrders=etsyBridgeOrders;
+window.etsyCreateDraft=etsyCreateDraft;
 async function requestInstagramCarousel(payload){
  const user=auth.currentUser;if(!user)throw Error("Googleログインが必要です");
  const token=await user.getIdToken(true);
