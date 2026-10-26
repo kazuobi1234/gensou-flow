@@ -760,7 +760,7 @@ async function runInstagramPrepareDiagnostic(){
   finally{if(button)button.disabled=false;}
 }
 function renderEtsyDraftPanel(w){
- const draft=w.etsyDraft||{},kaku=String(w.ai?.kaku?.result||"").trim(),desc=draft.description||kaku;
+ const draft=w.etsyDraft||{},desc=draft.description||"";
  return '<section class="ai-panel" id="etsy-draft-panel">'+
  '<h3>🛍 Etsy 出品・分析</h3>'+
  '<p>本人が作品内容を確認してから非公開下書きを作成できます。公開操作はありません。購入者向けファイルの登録はEtsy側で別途確認が必要です。</p>'+
