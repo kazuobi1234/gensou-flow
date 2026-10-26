@@ -759,9 +759,12 @@ async function runInstagramPrepareDiagnostic(){
   }catch(err){output.textContent=log.join("\n")+"\nテスト中断："+(err.message||String(err));}
   finally{if(button)button.disabled=false;}
 }
+function renderMultiAISettings(){
+ return '<section class="ai-panel"><h3>🤖 Claude・Gemini連携</h3><p>APIキーは画面に入力しません。サーバーに安全に設定した後、接続状態を確認できます。</p><div class="approval-actions"><button type="button" class="revise-btn" onclick="multiAIStatus(\'claude\')">Claudeの接続確認</button><button type="button" class="revise-btn" onclick="multiAIStatus(\'gemini\')">Geminiの接続確認</button></div><p id="multi-ai-result" role="status">未確認</p></section>';
+}
 function renderEtsyDraftPanel(w){
  const draft=w.etsyDraft||{},desc=draft.description||"";
- return '<section class="ai-panel" id="etsy-draft-panel">'+
+ return renderMultiAISettings()+'<section class="ai-panel" id="etsy-draft-panel">'+
  '<h3>🛍 Etsy 出品・分析</h3>'+
  '<p>本人が作品内容を確認してから非公開下書きを作成できます。公開操作はありません。購入者向けファイルの登録はEtsy側で別途確認が必要です。</p>'+
  '<label>商品タイトル</label><input id="etsy-draft-title" style="width:100%" value="'+escapeHtml(draft.title||w.name)+'">'+
@@ -1986,6 +1989,21 @@ async function completeEtsyAuthorization(){
   alert("Etsyとの認証結果を保存しました。");
  }catch(e){alert("認証が完了していません："+e.message);}
 }
+async function multiAIStatus(provider){
+ const el=document.getElementById("multi-ai-result");
+ if(!el)return;
+ el.textContent=(provider==="claude"?"Claude":"Gemini")+"の設定を確認中…";
+ try{
+  const user=auth.currentUser;
+  if(!user)throw Error("Googleログインが必要です");
+  const token=await user.getIdToken(true);
+  const response=await fetch("https://lkynzlittlxhbpvnuajw.supabase.co/functions/v1/company-multi-ai",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({provider,action:"status"})});
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok||!result.ok)throw Error(result.error||"接続確認が失敗しました");
+  el.textContent=(provider==="claude"?"Claude":"Gemini")+"："+(result.configured?"APIの設定あり（実行は未確認）":"APIの設定が不足")+" ／ "+(result.missing||[]).join(", ");
+ }catch(error){el.textContent="接続確認できません："+error.message;}
+}
+window.multiAIStatus=multiAIStatus;
 async function etsyBridgeStatus(){
  const el=document.getElementById("etsy-bridge-status");if(!el)return;
  el.textContent="Etsy接続を確認中";
