@@ -2013,7 +2013,7 @@ async function testGeminiOnce(){
   const jwt=await u.getIdToken(true);
   const response=await fetch("https://lkynzlittlxhbpvnuajw.supabase.co/functions/v1/company-multi-ai",{method:"POST",headers:{"Authorization":"Bearer "+jwt,"Content-Type":"application/json"},body:JSON.stringify({provider:"gemini",action:"test",confirmation:"無料枠接続テスト"})});
   const data=await response.json().catch(()=>({}));
-  if(!response.ok||!data.ok)throw Error((data.error||"通信失敗")+"（HTTP "+(data.upstream_status||response.status)+"／"+(data.reason||"不明")+"）"+(data.message?"："+data.message:""));
+  if(!response.ok||!data.ok){el.textContent="Gemini接続失敗：HTTP "+(data.upstream_status||response.status)+" / "+(data.reason||"原因不明")+(data.message?"："+data.message:"");return;}
   el.textContent="✅ Geminiから返信："+(data.answer||"応答本文なし");
  }catch(e){el.textContent="Gemini接続テスト失敗："+e.message;}
 }
