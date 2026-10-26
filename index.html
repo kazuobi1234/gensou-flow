@@ -1989,7 +1989,7 @@ async function completeEtsyAuthorization(){
 async function etsyBridgeStatus(){
  const el=document.getElementById("etsy-bridge-status");if(!el)return;
  el.textContent="Etsy接続を確認中";
- try{const d=await requestEtsyBridge({action:"status"});el.textContent=d.configured?"✓ Etsy認証情報は設定済み（接続成功は未検証）":"未設定の環境変数："+d.missing.join(", ");}
+ try{const d=await requestEtsyBridge({action:"status"});el.textContent="Etsy OAuth："+(d.oauth_connected?"認証情報保存済み":"未認証")+" ／ "+(d.configured?"API設定あり":"不足設定："+(d.missing||[]).join(", "));}
  catch(e){el.textContent="接続状態を確認できません："+e.message;}
 }
 async function etsyBridgeOrders(){
