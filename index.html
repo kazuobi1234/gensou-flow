@@ -775,7 +775,7 @@ function renderEtsyDraftPanel(w){
  '<p id="etsy-bridge-status" role="status">接続は未確認です。注文数は利益ではありません。</p>'+
  '<h4>🧾 非公開下書き登録（本人承認必須）</h4>'+
  '<p>商品カテゴリIDと制作時期はEtsyの実際の分類を確認して入力してください。デジタル商品を前提にしています。</p>'+
- '<label>価格（ショップ通貨）</label><input id="etsy-price" type="number" min="0.01" step="0.01" value="3.00" style="width:100%">'+
+ '<label>価格（ショップ通貨）</label><input id="etsy-price" type="number" min="0.01" step="0.01" placeholder="Etsyショップ通貨の価格" style="width:100%">'+
  '<label>商品カテゴリID（数値）</label><input id="etsy-taxonomy" inputmode="numeric" type="number" min="1" placeholder="Etsy公式分類ID" style="width:100%">'+
  '<label>制作時期（Etsyの許可する値）</label><input id="etsy-when" placeholder="made_to_order など、公式値を確認" style="width:100%">'+
  '<div class="approval-actions"><button type="button" class="revise-btn" onclick="etsyCreateDraft(\''+w.id+'\')">🔒 Etsyに非公開下書きを作成</button></div>'+
@@ -2001,7 +2001,7 @@ async function etsyCreateDraft(id){
  const el=document.getElementById("etsy-draft-remote-status"),w=state.works.find(v=>v.id===id);if(!el||!w)return;
  const title=document.getElementById("etsy-draft-title")?.value.trim()||"";
  const description=document.getElementById("etsy-draft-description")?.value.trim()||"";
- const price=Number(document.getElementById("etsy-price")?.value),taxonomy_id=Number(document.getElementById("etsy-taxonomy")?.value),when_made=document.getElementById("etsy-when")?.value.trim()||"";
+ const priceInput=document.getElementById("etsy-price")?.value.trim()||"";const price=priceInput?Number(priceInput):NaN,taxonomy_id=Number(document.getElementById("etsy-taxonomy")?.value),when_made=document.getElementById("etsy-when")?.value.trim()||"";
  if(!title||!description||!price||!Number.isInteger(taxonomy_id)||taxonomy_id<1||!when_made){el.textContent="タイトル・説明・価格・分類ID・制作時期を入力してください";return;}
  if(!confirm("AI作品の説明・本人の創作的関与・価格を確認しましたか？Etsyに非公開下書きを1件作成します。重複登録を防ぐため二度押ししないでください。"))return;
  const phrase=prompt("最終確認：Etsyに非公開の下書きを作成する と入力してください");
