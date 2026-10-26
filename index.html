@@ -760,7 +760,7 @@ async function runInstagramPrepareDiagnostic(){
   finally{if(button)button.disabled=false;}
 }
 function renderMultiAISettings(){
- return '<section class="ai-panel"><h3>🤖 Claude・Gemini連携</h3><p>0円運用です。APIキーは画面に入力しません。接続設定を確認できますが、請求設定の安全確認が終わるまでAIへの送信は停止しています。</p><div class="approval-actions"><button type="button" class="revise-btn" onclick="multiAIStatus(\'claude\')">Claudeの接続確認</button><button type="button" class="revise-btn" onclick="multiAIStatus(\'gemini\')">Geminiの接続確認</button></div><p id="multi-ai-result" role="status">未確認</p></section>';
+ return '<section class="ai-panel"><h3>🤖 Claude・Gemini連携</h3><p>0円運用です。APIキーは画面に入力しません。接続設定を確認できますが、請求設定の安全確認が終わるまでAIへの送信は停止しています。</p><div class="approval-actions"><button type="button" class="revise-btn" onclick="multiAIStatus(\'claude\')">Claudeの接続確認</button><button type="button" class="revise-btn" onclick="multiAIStatus(\'gemini\')">Geminiの接続確認</button><button type="button" class="revise-btn" onclick="testGeminiOnce()">Geminiに1回だけ話しかける</button></div><p id="multi-ai-result" role="status">未確認</p></section>';
 }
 function renderEtsyDraftPanel(w){
  const draft=w.etsyDraft||{},desc=draft.description||"";
@@ -2004,6 +2004,21 @@ async function multiAIStatus(provider){
  }catch(error){el.textContent="接続確認できません："+error.message;}
 }
 window.multiAIStatus=multiAIStatus;
+async function testGeminiOnce(){
+ const el=document.getElementById("multi-ai-result");if(!el)return;
+ if(!confirm("Google AI Studioの無料枠を使ってGeminiへ1回だけ接続テストします。実際の料金設定はGoogle側で管理されます。実行しますか？"))return;
+ el.textContent="Geminiから返事を受信中…";
+ try{
+  const u=auth.currentUser;if(!u)throw Error("Googleログインが必要です");
+  const jwt=await u.getIdToken(true);
+  const response=await fetch("https://lkynzlittlxhbpvnuajw.supabase.co/functions/v1/company-multi-ai",{method:"POST",headers:{"Authorization":"Bearer "+jwt,"Content-Type":"application/json"},body:JSON.stringify({provider:"gemini",action:"test",confirmation:"無料枠接続テスト"})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||!data.ok)throw Error(data.error||"通信失敗");
+  el.textContent="✅ Geminiから返信："+(data.answer||"応答本文なし");
+ }catch(e){el.textContent="Gemini接続テスト失敗："+e.message;}
+}
+window.testGeminiOnce=testGeminiOnce;
+
 async function etsyBridgeStatus(){
  const el=document.getElementById("etsy-bridge-status");if(!el)return;
  el.textContent="Etsy接続を確認中";
