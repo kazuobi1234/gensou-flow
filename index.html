@@ -760,18 +760,26 @@ async function runInstagramPrepareDiagnostic(){
   finally{if(button)button.disabled=false;}
 }
 function renderEtsyDraftPanel(w){
- const draft=w.etsyDraft||{};
- const kaku=String(w.ai?.kaku?.result||"").trim();
- const desc=draft.description||kaku;
+ const draft=w.etsyDraft||{},kaku=String(w.ai?.kaku?.result||"").trim(),desc=draft.description||kaku;
  return '<section class="ai-panel" id="etsy-draft-panel">'+
- '<h3>🛍 Etsy 出品準備（非公開）</h3>'+
- '<p>カクの成果を出品用メモへまとめます。EtsyのAPI連携・出品実行はまだ未接続で、ここで保存しても販売サイトは変更されません。</p>'+
- '<label>商品タイトル案</label><input id="etsy-draft-title" style="width:100%" value="'+escapeHtml(draft.title||w.name)+'">'+
- '<label>説明文・タグ・制作仕様（カクの成果を引用）</label>'+
- '<textarea id="etsy-draft-description" style="min-height:180px">'+escapeHtml(desc)+'</textarea>'+
- '<div class="approval-actions"><button type="button" class="revise-btn" onclick="saveEtsyPreparation(\''+w.id+'\')">💾 Etsy出品メモを保存（非公開）</button>'+
- '<button type="button" class="revise-btn" onclick="copyEtsyPreparation(\''+w.id+'\')">📋 Etsy用の文面をコピー</button></div>'+
- '<p id="etsy-draft-status" role="status">'+(draft.saved_at?'✓ 出品メモ保存済み。Etsy未反映。':kaku?'カクの成果を読み込みました。確認して保存してください。':'カクの成果はまだありません。カクに商品タイトル・タグ・説明文を作成させるとここに表示されます。')+'</p>'+
+ '<h3>🛍 Etsy 出品・分析</h3>'+
+ '<p>本人が作品内容を確認してから非公開下書きを作成できます。公開操作はありません。購入者向けファイルの登録はEtsy側で別途確認が必要です。</p>'+
+ '<label>商品タイトル</label><input id="etsy-draft-title" style="width:100%" value="'+escapeHtml(draft.title||w.name)+'">'+
+ '<label>説明文・AI使用開示・タグなど</label><textarea id="etsy-draft-description" style="min-height:180px">'+escapeHtml(desc)+'</textarea>'+
+ '<div class="approval-actions"><button type="button" class="revise-btn" onclick="saveEtsyPreparation(\''+w.id+'\')">💾 出品メモ保存</button>'+
+ '<button type="button" class="revise-btn" onclick="copyEtsyPreparation(\''+w.id+'\')">📋 文面コピー</button></div>'+
+ '<p id="etsy-draft-status" role="status">'+(draft.saved_at?'✓ 出品メモ保存済み。Etsy未反映。':'Etsyには未反映。')+'</p>'+
+ '<h4>🔌 Etsy API 接続と販売分析</h4>'+
+ '<div class="approval-actions"><button type="button" class="revise-btn" onclick="etsyBridgeStatus()">接続状態を確認</button>'+
+ '<button type="button" class="revise-btn" onclick="etsyBridgeOrders()">注文集計を取得</button></div>'+
+ '<p id="etsy-bridge-status" role="status">接続は未確認です。注文数は利益ではありません。</p>'+
+ '<h4>🧾 非公開下書き登録（本人承認必須）</h4>'+
+ '<p>商品カテゴリIDと制作時期はEtsyの実際の分類を確認して入力してください。デジタル商品を前提にしています。</p>'+
+ '<label>価格（ショップ通貨）</label><input id="etsy-price" type="number" min="0.01" step="0.01" value="3.00" style="width:100%">'+
+ '<label>商品カテゴリID（数値）</label><input id="etsy-taxonomy" inputmode="numeric" type="number" min="1" placeholder="Etsy公式分類ID" style="width:100%">'+
+ '<label>制作時期（Etsyの許可する値）</label><input id="etsy-when" placeholder="made_to_order など、公式値を確認" style="width:100%">'+
+ '<div class="approval-actions"><button type="button" class="revise-btn" onclick="etsyCreateDraft(\''+w.id+'\')">🔒 Etsyに非公開下書きを作成</button></div>'+
+ '<p id="etsy-draft-remote-status" role="status">画像・商品ファイルのアップロード、公開は行いません。</p>'+
  '</section>';
 }
 function saveEtsyPreparation(id){
@@ -1949,6 +1957,42 @@ async function requestInstagramApprovedPublish(payload){
  const data=await response.json().catch(()=>({}));if(!response.ok)throw Error(data.error||"公開結果を確認できません");return data;
 }
 window.requestInstagramApprovedPublish=requestInstagramApprovedPublish;
+
+// Etsy: authenticated read-only summary and user-approved draft creation.
+async function requestEtsyBridge(payload){
+ const u=auth.currentUser;if(!u)throw Error("Googleログインが必要です");
+ const token=await u.getIdToken(true);
+ const res=await fetch("https://lkynzlittlxhbpvnuajw.supabase.co/functions/v1/etsy-bridge",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify(payload)});
+ const json=await res.json().catch(()=>({}));if(!res.ok||!json.ok)throw Error(json.error||"Etsy APIの確認に失敗しました");
+ return json;
+}
+async function etsyBridgeStatus(){
+ const el=document.getElementById("etsy-bridge-status");if(!el)return;
+ el.textContent="Etsy接続を確認中";
+ try{const d=await requestEtsyBridge({action:"status"});el.textContent=d.configured?"✓ Etsy認証情報は設定済み（接続成功は未検証）":"未設定の環境変数："+d.missing.join(", ");}
+ catch(e){el.textContent="接続状態を確認できません："+e.message;}
+}
+async function etsyBridgeOrders(){
+ const el=document.getElementById("etsy-bridge-status");if(!el)return;el.textContent="注文データを照会中";
+ try{const d=await requestEtsyBridge({action:"orders"});el.textContent="最新取得分："+d.receipt_count+"件／有料注文："+d.paid_count+"件／キャンセル："+d.canceled_count+"件"+(d.has_more?"。101件目以降は未集計":"")+"。利益額は算出していません。";}
+ catch(e){el.textContent="注文集計を確認できません："+e.message;}
+}
+async function etsyCreateDraft(id){
+ const el=document.getElementById("etsy-draft-remote-status"),w=state.works.find(v=>v.id===id);if(!el||!w)return;
+ const title=document.getElementById("etsy-draft-title")?.value.trim()||"";
+ const description=document.getElementById("etsy-draft-description")?.value.trim()||"";
+ const price=Number(document.getElementById("etsy-price")?.value),taxonomy_id=Number(document.getElementById("etsy-taxonomy")?.value),when_made=document.getElementById("etsy-when")?.value.trim()||"";
+ if(!title||!description||!price||!Number.isInteger(taxonomy_id)||taxonomy_id<1||!when_made){el.textContent="タイトル・説明・価格・分類ID・制作時期を入力してください";return;}
+ if(!confirm("AI作品の説明・本人の創作的関与・価格を確認しましたか？Etsyに非公開下書きを1件作成します。重複登録を防ぐため二度押ししないでください。"))return;
+ const phrase=prompt("最終確認：Etsyに非公開の下書きを作成する と入力してください");
+ if(phrase!=="Etsyに非公開の下書きを作成する")return;
+ el.textContent="下書き作成を申請中。結果不明のときは二重登録を避けてEtsy管理画面を確認してください。";
+ try{const d=await requestEtsyBridge({action:"draft",confirmation:phrase,listing:{title,description,price,taxonomy_id,when_made,who_made:"i_did",quantity:1,is_digital:true}});
+ w.etsyDraft={...(w.etsyDraft||{}),title,description,remote_listing_id:d.listing_id,remote_status:"draft",saved_at:new Date().toISOString()};persist();
+ el.textContent="✓ Etsy非公開下書き作成応答："+(d.listing_id||"IDなし")+"。画像・ファイル未登録、未公開です。";
+ }catch(e){el.textContent="作成結果を確認できません："+e.message+"。Etsy管理画面で確認するまで再実行しないでください。";}
+}
+
 async function requestInstagramCarousel(payload){
  const user=auth.currentUser;if(!user)throw Error("Googleログインが必要です");
  const token=await user.getIdToken(true);
