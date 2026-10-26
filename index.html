@@ -760,7 +760,7 @@ async function runInstagramPrepareDiagnostic(){
   finally{if(button)button.disabled=false;}
 }
 function renderMultiAISettings(){
- return '<section class="ai-panel"><h3>🤖 Claude・Gemini連携</h3><p>APIキーは画面に入力しません。サーバーに安全に設定した後、接続状態を確認できます。</p><div class="approval-actions"><button type="button" class="revise-btn" onclick="multiAIStatus(\'claude\')">Claudeの接続確認</button><button type="button" class="revise-btn" onclick="multiAIStatus(\'gemini\')">Geminiの接続確認</button></div><p id="multi-ai-result" role="status">未確認</p></section>';
+ return '<section class="ai-panel"><h3>🤖 Claude・Gemini連携</h3><p>0円運用です。APIキーは画面に入力しません。接続設定を確認できますが、請求設定の安全確認が終わるまでAIへの送信は停止しています。</p><div class="approval-actions"><button type="button" class="revise-btn" onclick="multiAIStatus(\'claude\')">Claudeの接続確認</button><button type="button" class="revise-btn" onclick="multiAIStatus(\'gemini\')">Geminiの接続確認</button></div><p id="multi-ai-result" role="status">未確認</p></section>';
 }
 function renderEtsyDraftPanel(w){
  const draft=w.etsyDraft||{},desc=draft.description||"";
