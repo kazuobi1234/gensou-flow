@@ -783,6 +783,14 @@ function renderEtsyDraftPanel(w){
  '<label>制作時期（Etsyの許可する値）</label><input id="etsy-when" placeholder="made_to_order など、公式値を確認" style="width:100%">'+
  '<div class="approval-actions"><button type="button" class="revise-btn" onclick="etsyCreateDraft(\''+w.id+'\')">🔒 Etsyに非公開下書きを作成</button></div>'+
  '<p id="etsy-draft-remote-status" role="status">画像・商品ファイルのアップロード、公開は行いません。</p>'+
+ '<h4>📦 Etsy商品のファイル登録</h4>'+
+ '<p>先にEtsyへ非公開下書きを作成し、登録された商品番号を入力してください。公開は行いません。</p>'+
+ '<label>非公開商品番号</label><input id="etsy-upload-listing-id" type="text" inputmode="numeric" placeholder="Etsyの商品番号" style="width:100%">'+
+ '<label>購入者へ渡すファイル（最大8MB）</label><input id="etsy-delivery-file" type="file" accept=".zip,.jpg,.jpeg,.png,.pdf" style="width:100%">'+
+ '<label>商品紹介画像（最大8MB）</label><input id="etsy-preview-file" type="file" accept="image/png,image/jpeg" style="width:100%">'+
+ '<div class="approval-actions"><button type="button" class="revise-btn" onclick="etsyUploadAsset(\'upload_file\')">商品ファイルを登録</button><button type="button" class="revise-btn" onclick="etsyUploadAsset(\'upload_image\')">紹介画像を登録</button><button type="button" class="revise-btn" onclick="etsyVerifyListing()">商品状態を確認</button></div>'+
+ '<p id="etsy-asset-status" role="status">未実行。登録にはEtsy認証が必要です。</p>'+
+ 
  '</section>';
 }
 function saveEtsyPreparation(id){
@@ -2018,6 +2026,30 @@ async function testGeminiOnce(){
  }catch(e){el.textContent="Gemini接続テスト失敗："+e.message;}
 }
 window.testGeminiOnce=testGeminiOnce;
+
+
+async function etsyVerifyListing(){
+ const el=document.getElementById("etsy-asset-status"),listing_id=(document.getElementById("etsy-upload-listing-id")?.value||"").trim();if(!el)return;
+ try{const d=await requestEtsyBridge({action:"listing_status",listing_id});el.textContent="Etsy商品："+d.listing_id+"／状態："+(d.state||"不明")+"／形式："+(d.type||"不明");}
+ catch(e){el.textContent="Etsy商品を確認できません："+e.message;}
+}
+async function etsyUploadAsset(action){
+ const el=document.getElementById("etsy-asset-status"),listing_id=(document.getElementById("etsy-upload-listing-id")?.value||"").trim();if(!el)return;
+ const input=document.getElementById(action==="upload_file"?"etsy-delivery-file":"etsy-preview-file"),file=input?.files?.[0];
+ if(!/^[1-9][0-9]{0,17}$/.test(listing_id)||!file||file.size>8*1024*1024){el.textContent="商品番号と8MB以下のファイルを確認してください";return;}
+ if(!confirm("Etsyの商品 "+listing_id+" に「"+file.name+"」を登録します。ショップとファイル内容を確認しましたか？"))return;
+ const button=Array.from(document.querySelectorAll("button")).find(x=>x.getAttribute("onclick")==="etsyUploadAsset('"+action+"')");
+ if(button)button.disabled=true;
+ el.textContent="ファイル登録処理中。重複登録を避けるため再実行しないでください。";
+ try{
+  const b64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(",")[1]||"");reader.onerror=()=>reject(Error("ファイルを読み取れません"));reader.readAsDataURL(file);});
+  const d=await requestEtsyBridge({action,listing_id,filename:file.name,data_base64:b64,confirmation:"この非公開商品にファイルを登録する"});
+  el.textContent="✅ Etsyへ登録成功応答。商品番号："+d.listing_id+"／登録ID："+(d.asset_id||"確認不可")+"。公開はしていません。";
+ }catch(e){el.textContent="登録結果は未確認："+e.message+"。Etsy管理画面を確認するまで再実行しないでください。";}
+ finally{if(button)button.disabled=false;}
+}
+window.etsyVerifyListing=etsyVerifyListing;
+window.etsyUploadAsset=etsyUploadAsset;
 
 async function etsyBridgeStatus(){
  const el=document.getElementById("etsy-bridge-status");if(!el)return;
