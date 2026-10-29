@@ -65,6 +65,7 @@
 | 2026-10-29 | ChatGPT | GitHub/Supabase棚卸し | 配備確認済み | GitHub main `6c1f75a`, Supabase Edge Functions一覧13件 | Etsy機能の非公開検証 |
 | 2026-10-29 | Muse | GitHub共通進捗ノートの書き込み検証 | 実機確認済み | GitHubへの追記成功・コミットSHA確認 | ChatGPT側で読み取り確認 |
 | 2026-10-30 | Muse | ジャービス開発ロードマップ・期間見積もり | 未検証（見積もり） | Museの見積もりを本節に追記（2026-10-30、ユーザーの依頼） | ChatGPT側で「6. ジャービス開発ロードマップ・期間見積もり」の読み取り確認 |
+| 2026-10-30 | Muse | Metricool調査・評価 | 未検証（机上調査） | Metricool公式料金ページ・ヘルプを2026-10-30に確認。詳細は本ノート「7. Metricool調査・評価」 | ChatGPT側で読み取り確認と意見 |
 
 - APIキー・トークン・個人情報・販売顧客情報は絶対に記録しない。
 - 変更前に最新内容を読み、他者の更新を上書きしない。根拠・確認日・状態を必ず残す。
@@ -103,3 +104,52 @@
 2. Supabaseの実テーブル・RLSの棚卸しと設計確定
 3. 朝の統合ブリーフ（Gmail毎朝要約の拡張）
 4. 現在の優先順位（2026-10-30時点）: フリーランス準備が優先。ジャービス開発はこの進捗ノートの維持を中心とし、上記は再開時期を決めてから着手する。
+
+## 7. Metricool調査・評価（2026-10-30、Muse）
+
+- 作成: 2026-10-30、Muse（九軒の依頼で追記）。状態: **公式情報の机上調査**。Metricoolのアカウント作成・SNS接続・投稿は未実施のため**実機未検証**。導入可否は九軒の判断待ち。
+- チャッピーへの依頼: 本節を読んで、導入判断への意見・懸念・代替案を返してほしい。
+
+### 結論
+
+- **導入価値あり。ただし既存AIカンパニーの置き換えではなく、無料プラン＋公式MCPでの併用（補完）が前提。**
+- 補完できる弱点: 現在のAIカンパニーは「予約投稿」と「Instagram投稿結果の自動取得・分析」が未実装／未完成（2026-10-29のコード確認に基づく）。Metricool無料プランでこの2点を先に試せる。
+- EtsyはMetricoolの対象外。`etsy-bridge` 等の既存機能は残し、壊さない。
+
+### 具体的な数字（2026-10-30、公式料金ページで確認）
+
+- 無料プラン: 1ブランド、各SNS 1アカウント、**公開投稿は月20件**（旧情報の「月50件」は失効）、YouTubeは月10本の表記あり、分析履歴は直近30日（透かし入り・PDF出力なし）、AI投稿文生成は月5クレジット、競合分析は5件固定、ユーザー1名。
+- 無料で使える: Instagram／YouTube／TikTok／Facebook／Threads／Bluesky／Pinterest等の予約投稿、最適投稿時間、コメント・DMの統合Inbox、**公式MCP**。
+- 無料で使えない: 自動返信「Flows」（有料のみ）、LinkedIn、X（有料＋アカウントごとに月$10の追加料金）、REST API、Zapier／Make、Looker Studio、Canva／Google Drive連携、PDF／PPTレポート。
+- 有料プラン（USD、税別）: Starter 5ブランド 年払い月換算$20／月払い$25（APIなし）。Advanced 15ブランド 年払い月換算$53／月払い$67（ここからREST API・Zapier／Make・Looker Studio可）。
+
+### ジャービス連携（公式情報）
+
+- **公式MCPサーバーあり: `https://ai.metricool.com/mcp`**。**全プラン（無料含む）で利用可**と公式ヘルプに記載。認証はOAuthまたはユーザートークン。分析取得・予約投稿・最適時間取得など20以上のツール。
+- 公式REST API: `https://app.metricool.com/api`。**Advanced／Customプランのみ**。無料・Starterでは使えない。
+- 公式Webhookの記載は**確認できません**（Zapier／Make経由の回避策のみ）。
+- 注意（未確認）: ChatGPT PlusでMetricoolの公式Appsコネクタが使えるかは実機未確認。PlusでカスタムMCPサーバーを追加できない点（2026-10-29にOpenAI公式ヘルプで確認済み）と混同しないこと。MCP経由で無料プランが参照できる分析期間は、公式ページ内で「30日」と「3か月」の表記ゆれがあり未確定。
+
+### 2026年10月の新機能
+
+- 公式What's Newに「Product Updates – October 2026」は**確認できません**。最新は「Product Updates – September 2026」（2026-10-06公開: YouTubeのViews／Engaged views分離、Instagramのフォロワー増減内訳、Collab指標など）。
+
+### スマホ環境
+
+- Androidアプリあり（予約・分析・Inbox・AI文生成可、一部機能はWebのみ）。SamsungブラウザでWeb版プランナーが快適に使えるかは**確認できません**（公式の前提はPCブラウザ＋公式アプリ）。
+
+### 推奨する次の作業（順番）
+
+1. 無料アカウント作成（カード登録なし）※実行は九軒の承認後
+2. Instagram（kunogistudio）とYouTube（くのぎ日和）だけを接続
+3. 予約投稿を1件だけ実機テスト
+4. MCP経由で分析がChatGPT／Claudeから読めるか実機テスト
+5. 既存フローと結果を比較し、定常運用するか判断。有料Advancedは現時点では不要
+
+### 主な出典（確認日: 2026-10-30）
+
+- 料金・プラン比較: https://metricool.com/pricing/
+- 無料／有料の違い: https://help.metricool.com/main-differences-between-free-and-paid-plans-bl0v9
+- MCP接続: https://help.metricool.com/how-to-connect-metricools-mcp-eqp9h
+- API基礎ガイド: https://help.metricool.com/basic-guide-for-api-integration-r97af
+- What's New: https://metricool.com/whats-new/
